@@ -1,0 +1,13 @@
+/src/wandb/
+/src/deep_transit.egg-info/
+/src/deep_transit/__pycache__/
+*.tar
+*.pyc
+_python_cache
+.vscode
+*.ipynb
+.idea
+*.egg
+*.pth
+/src/deep_transit/.ipynb_checkpoints
+notebooks/
