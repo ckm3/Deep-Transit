@@ -1,7 +1,7 @@
 import io
 
 import torch
-from deep_transit import config
+from . import config
 import warnings
 import itertools
 
@@ -10,12 +10,12 @@ from PIL import Image
 from tqdm import tqdm
 
 import lightkurve as lk
-from deep_transit.model import YOLOv3
+from .model import YOLOv3
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from wotan import flatten
 
-from deep_transit.utils import (
+from .utils import (
     warning_on_one_line,
     predict_bboxes,
     non_max_suppression,

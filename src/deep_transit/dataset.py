@@ -10,7 +10,7 @@ import torch
 
 from PIL import Image, ImageFile
 from torch.utils.data import Dataset, DataLoader
-from deep_transit.utils import (
+from .utils import (
     cells_to_bboxes,
     iou_width_height as iou,
     non_max_suppression as nms,

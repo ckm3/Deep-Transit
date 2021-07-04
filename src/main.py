@@ -1,1 +1,0 @@
-from deep_transit import dt_lightcurve
