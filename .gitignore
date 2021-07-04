@@ -1,2 +1,3 @@
 /src/wandb/
 /src/deep_transit.egg-info/
+/src/deep_transit/__pycache__/

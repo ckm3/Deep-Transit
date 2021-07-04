@@ -5,7 +5,7 @@ import numpy as np
 import os
 import random
 import torch
-from torchvision.ops import nms, generalized_box_iou, box_iou
+from torchvision.ops import nms
 from collections import Counter
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -265,6 +265,97 @@ def average_precision(
     return torch.trapz(precisions, recalls).float()
 
 
+def save_PR_curve(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint"):
+    """
+    Save PR curve to a figure for checking performance conveniently.
+    Parameters
+    ----------
+    pred_boxes : list
+                list of lists containing all bboxes with each bboxes
+                specified as [train_idx, confidence, x, y, w, h]
+    true_boxes : list
+                Similar as pred_boxes except all the correct ones
+    iou_threshold : float
+                    Threshold where predicted bboxes is correct
+    box_format : str
+                "midpoint" or "corners" used to specify bboxes
+    """
+    # used for numerical stability later on
+    epsilon = 1e-6
+
+    # find the amount of bboxes for each training example
+    # Counter here finds how many ground truth bboxes we get
+    # for each training example, so let's say img 0 has 3,
+    # img 1 has 5 then we will obtain a dictionary with:
+    # amount_bboxes = {0:3, 1:5}
+    amount_bboxes = Counter([gt[0] for gt in true_boxes])
+
+    # We then go through each key, val in this dictionary
+    # and convert to the following (w.r.t same example):
+    # ammount_bboxes = {0:torch.tensor[0,0,0], 1:torch.tensor[0,0,0,0,0]}
+    for key, val in amount_bboxes.items():
+        amount_bboxes[key] = torch.zeros(val)
+
+    # sort by box probabilities which is index 2
+    pred_boxes.sort(key=lambda x: x[1], reverse=True)
+    TP = torch.zeros((len(pred_boxes)))
+    FP = torch.zeros((len(pred_boxes)))
+    total_true_bboxes = len(true_boxes)
+
+    # If none exists then we can safely skip
+    if total_true_bboxes == 0:
+        return 0
+
+    for detection_idx, detection in enumerate(pred_boxes):
+        # Only take out the ground_truths that have the same
+        # training idx as detection
+        ground_truth_img = [
+            bbox for bbox in true_boxes if bbox[0] == detection[0]
+        ]
+
+        best_iou = 0
+
+        for idx, gt in enumerate(ground_truth_img):
+            iou = intersection_over_union(
+                torch.tensor(detection[2:]),
+                torch.tensor(gt[2:]),
+                box_format=box_format,
+            )
+
+            if iou > best_iou:
+                best_iou = iou
+                best_gt_idx = idx
+
+        if best_iou > iou_threshold:
+            # only detect ground truth detection once
+            if amount_bboxes[detection[0]][best_gt_idx] == 0:
+                # true positive and add this bounding box to seen
+                TP[detection_idx] = 1
+                amount_bboxes[detection[0]][best_gt_idx] = 1
+            else:
+                FP[detection_idx] = 1
+
+        # if IOU is lower then the detection is a false positive
+        else:
+            FP[detection_idx] = 1
+
+    TP_cumsum = torch.cumsum(TP, dim=0)
+    FP_cumsum = torch.cumsum(FP, dim=0)
+    recalls = TP_cumsum / (total_true_bboxes + epsilon)
+    precisions = TP_cumsum / (TP_cumsum + FP_cumsum + epsilon)
+    precisions = torch.cat((torch.tensor([1]), precisions))
+    recalls = torch.cat((torch.tensor([0]), recalls))
+
+    plt.figure()
+    plt.plot(recalls, precisions, 'k')
+    plt.savefig()
+
+    # torch.trapz for numerical integration
+    # ap.append(torch.trapz(precisions, recalls))
+
+    return torch.trapz(precisions, recalls).float()
+
+
 def plot_image(image, boxes):
     """Plots predicted bounding boxes on the image"""
     # cmap = plt.get_cmap("tab20b")
@@ -489,6 +580,28 @@ def load_checkpoint(checkpoint_file, model, optimizer, lr, lr_scheduler):
 def load_model(model_file, model):
     tqdm.write(f"Loading Model: {model_file}")
     model.load_state_dict(torch.load(model_file, map_location=config.DEVICE))
+
+
+def save_checkpoint_to_model(checkpoint_path, model_path):
+    """
+    Save trained checkpoint to models
+    Parameters
+    ----------
+    checkpoint_path : str
+    model_path : str
+    """
+    from . import config
+    from .utils import load_checkpoint
+    from .model import YOLOv3
+    import torch.optim as optim
+
+    model = YOLOv3().to(config.DEVICE)
+    optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=2, factor=0.5, verbose=True,
+                                                        cooldown=3)
+    _ = load_checkpoint(checkpoint_path, model, optimizer, config.LEARNING_RATE, lr_scheduler)
+    print("=> Saving model")
+    torch.save(model.state_dict(), model_path)
 
 
 def get_loaders(train_csv_path, validation_csv_path):

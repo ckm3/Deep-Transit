@@ -23,5 +23,5 @@ setuptools.setup(
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"],
     python_requires='>=3.6.1',
-    install_requires=["lightkurve>=2.0", "torch", "torchvision"],
+    install_requires=["lightkurve>=2.0", "torch", "torchvision", "wotan"],
 )
