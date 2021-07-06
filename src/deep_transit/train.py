@@ -2,16 +2,12 @@
 Main file for training Yolo models on Pascal VOC and COCO dataset
 """
 
-# import os
-
-# os.environ["WANDB_MODE"] = "offline"
 
 from . import config
 import torch
 import torch.optim as optim
 
 torch.backends.cudnn.benchmark = True
-# torch.autograd.set_detect_anomaly(True)
 from .model import YOLOv3
 from tqdm.autonotebook import tqdm
 from .utils import (
@@ -23,16 +19,22 @@ from .utils import (
 )
 from .loss import YoloLoss
 
-
-# import wandb
-#
-# wandb.init(project='deep_transit',
-#            config=dict(
-#                LEARNING_RATE=config.LEARNING_RATE,
-#                WEIGHT_DECAY=config.WEIGHT_DECAY,
-#                BATCH_SIZE=config.BATCH_SIZE,
-#            ))
-
+if config.ENABLE_WANDB:
+    import os
+    os.environ["WANDB_MODE"] = "offline"
+    import wandb
+    wandb.init(project='deep_transit',
+               config=dict(
+                   LEARNING_RATE=config.LEARNING_RATE,
+                   WEIGHT_DECAY=config.WEIGHT_DECAY,
+                   BATCH_SIZE=config.BATCH_SIZE,
+               ))
+else:
+    class wandb:
+        @classmethod
+        def log(*args, **kwargs): pass
+        @classmethod
+        def watch(*args, **kwargs): pass
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
     loop = tqdm(train_loader)
@@ -62,12 +64,11 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
         if avg_loss == -1:
             avg_loss = loss
         avg_loss = avg_loss * 0.95 + loss * 0.05
-        # wandb.log({"loss": loss.item(), "avg loss": avg_loss.item()})
+        wandb.log({"loss": loss.item(), "avg loss": avg_loss.item()})
 
 
 def train(patience=2, cooldown=3):
     model = YOLOv3().to(config.DEVICE)
-    # models = SimplifiedYOLOv3().to(config.DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )
@@ -92,7 +93,7 @@ def train(patience=2, cooldown=3):
             * torch.tensor(config.S).unsqueeze(1).unsqueeze(1).repeat(1, sum([len(x) for x in config.ANCHORS]) // 3, 2)
     ).to(config.DEVICE)
 
-    # wandb.watch(models)
+    wandb.watch(model)
 
     for epoch in range(epoch_old, config.NUM_EPOCHS + 1):
         train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors)
@@ -132,8 +133,8 @@ def train(patience=2, cooldown=3):
         mAP = (AP50 + AP75 + AP90) / 3
         lr_scheduler.step(mAP)
         tqdm.write(f"AP50: {AP50:.3f}, AP75: {AP75:.3f}, AP90: {AP90:.3f}")
-        # wandb.log({'epoch': epoch, 'ap50': AP50, 'ap75': AP75, 'ap90': AP90, 'mAP': mAP,
-        #            'lr': optimizer.param_groups[0]['lr']})
+        wandb.log({'epoch': epoch, 'ap50': AP50, 'ap75': AP75, 'ap90': AP90, 'mAP': mAP,
+                   'lr': optimizer.param_groups[0]['lr']})
 
 
 if __name__ == "__main__":

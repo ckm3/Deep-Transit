@@ -17,6 +17,7 @@ S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
 PIN_MEMORY = True
 LOAD_MODEL = False
 SAVE_MODEL = False
+ENABLE_WANDB = True
 CHECKPOINT_FILE = "checkpoint.pth.tar"
 
 DATASET = 'Data'
