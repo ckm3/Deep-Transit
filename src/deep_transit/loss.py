@@ -15,7 +15,6 @@ class YoloLoss(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
         # Constants signifying how much to pay for each respective part of the loss
-        # self.lambda_class = 1
         self.lambda_noobj = 10
         self.lambda_obj = 1
         self.lambda_box = 10
@@ -54,6 +53,7 @@ class YoloLoss(nn.Module):
 
             # MSE loss
             box_loss = self.mse(predictions[..., 1:5][obj], target[..., 1:5][obj])
+
 
         return (
                 self.lambda_box * box_loss

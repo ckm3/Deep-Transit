@@ -2,8 +2,9 @@ import torch
 from torchvision import transforms
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-# from utils import seed_everything
-# seed_everything()  # If you want deterministic behavior
+from .utils import seed_everything
+seed_everything()  # If you want deterministic behavior
+# DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 0
 IMAGE_SIZE = 416
 LEARNING_RATE = 3e-5
@@ -14,6 +15,7 @@ CONF_THRESHOLD = 0.5
 MAP_IOU_THRESH = 0.5
 NMS_IOU_THRESH = 0.1
 S = [IMAGE_SIZE // 32, IMAGE_SIZE // 16, IMAGE_SIZE // 8]
+ENABLE_AMP = True
 PIN_MEMORY = True
 LOAD_MODEL = False
 SAVE_MODEL = False

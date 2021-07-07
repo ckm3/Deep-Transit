@@ -229,6 +229,9 @@ class DeepTransit:
                 lc_object = lc_object.remove_nans()
             else:
                 raise TypeError(f"'lc_obj' should be a `lightkurve.LightCurve object`")
+
+        lc_object.sort('time')
+
         if is_flatten is True:
             self.lc = lc_object
         else:
@@ -259,23 +262,21 @@ class DeepTransit:
         for time_block_index in np.append((np.diff(self.lc.time.value) > 10).nonzero()[0], len(self.lc) - 1):
             lc_block = self.lc[time_initial_index:time_block_index]
             time_initial_index = time_block_index + 1
-            for start_time, stop_time in list(_split_light_curve(lc_block, split_time=30, back_step=5)):
+            for start_time, stop_time in list(_split_light_curve(lc_block.remove_nans(), split_time=30, back_step=5)):
                 mask = (lc_block.time.value >= start_time) & (lc_block.time.value <= stop_time)
                 selected_lc = lc_block[mask]
-                if len(selected_lc) < 20 / self.exp_time:
+                if len(selected_lc) < 5 / self.exp_time:
                     continue
                 flux_min, flux_max = np.nanmin(selected_lc.flux.value) * 1.02 - 0.02 * np.nanmax(
                     selected_lc.flux.value), np.nanmax(selected_lc.flux.value)
                 for t0, t1 in _split_light_curve(selected_lc.remove_nans(), split_time=10, back_step=3):
                     mask = (selected_lc.time.value >= t0) & (selected_lc.time.value <= t1)
                     splited_flatten_lc = selected_lc[mask]
-                    if len(splited_flatten_lc) < 5 / self.exp_time:
+                    if len(splited_flatten_lc) < 1 / self.exp_time:
                         continue
                     img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max),
                                                           exp_time=self.exp_time)
                     image = config.data_transforms(np.array(Image.fromarray(img_arr).convert("L")))
-                    # image = torch.unsqueeze(image, 0)
-                    # image = np.expand_dims(image, 0)
                     yield splited_flatten_lc, image, flux_min, flux_max
 
     def _data_loader(self, batch_size=1):
@@ -336,7 +337,7 @@ class DeepTransit:
                 real_unit_bboxes += predicted_bboxes_in_real_unit
 
                 # fig, ax = plt.subplots(1, constrained_layout=True)
-                # lc_data[index].scatter(ax=ax)
+                # lc_data[index].plot(ax=ax)
                 # from matplotlib.patches import Rectangle
                 # from matplotlib.collections import PatchCollection
                 # recs = []
@@ -451,7 +452,7 @@ def kepler_id_to_lc(kicid):
     # prepare the kicid
 
     # fits file location
-    lc_fits_folder_path = f'/home/ckm/Data2/.lightkurve-cache/mastDownload/Kepler/*{kicid}*'
+    lc_fits_folder_path = f'/home/ckm/.lightkurve-cache/mastDownload/Kepler/*{kicid}*'
 
     lc_collection = []
     for i in iglob(lc_fits_folder_path + '/*llc.fits'):
@@ -482,7 +483,7 @@ def main():
     # lc = kepler_id_to_lc(757076).stitch()
 
     # lc = kepler_id_to_lc(1025494).stitch()
-    # lc = kepler_id_to_lc(11446443).stitch() # Kepeler-1b
+    lc = kepler_id_to_lc(11446443).stitch() # Kepeler-1b
 
     # lc = kepler_id_to_lc(11554435).stitch()
     # lc = kepler_id_to_lc(10874614).stitch()
@@ -491,11 +492,11 @@ def main():
     # lc = tess_id_to_lc(100014359).stitch()
     # lc.sort('time')
 
-    # lc = lc[lc.time.value > 1500]
+    lc = lc[lc.time.value < 135]
 
-    import pandas as pd
-    data = pd.read_csv('../../1809.05967/pimensatesslightcurve.csv')
-    lc = lk.LightCurve(time=data.time, flux=data.flux)
+    # import pandas as pd
+    # data = pd.read_csv('../../1809.05967/pimensatesslightcurve.csv')
+    # lc = lk.LightCurve(time=data.time, flux=data.flux)
 
     # t = lc.time.value[0]
     # sub_sample_time = []
@@ -518,8 +519,8 @@ def main():
     # plt.show()
     # print(list(dt_lc._split_light_curve()))
 
-    # bboxes = dt.transit_detection('models/Model_Kepler.pth', batch_size=3)
-    bboxes = dt.transit_detection('models/Model_TESS.pth', batch_size=2)
+    bboxes = dt.transit_detection('/home/ckm/PycharmProjects/Deep-Transit/models/kepler_snr_model.pth', batch_size=3)
+    # bboxes = dt.transit_detection('models/Model_TESS.pth', batch_size=2)
     # bboxes = sorted(bboxes, key=lambda x: x[1], reverse=False)
 
     fig, ax = plt.subplots()

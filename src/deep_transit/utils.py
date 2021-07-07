@@ -265,7 +265,7 @@ def average_precision(
     return torch.trapz(precisions, recalls).float()
 
 
-def save_PR_curve(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint"):
+def save_PR_curve(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoint", figure_path=None):
     """
     Save PR curve to a figure for checking performance conveniently.
     Parameters
@@ -346,14 +346,11 @@ def save_PR_curve(pred_boxes, true_boxes, iou_threshold=0.5, box_format="midpoin
     precisions = torch.cat((torch.tensor([1]), precisions))
     recalls = torch.cat((torch.tensor([0]), recalls))
 
-    plt.figure()
-    plt.plot(recalls, precisions, 'k')
-    plt.savefig()
-
-    # torch.trapz for numerical integration
-    # ap.append(torch.trapz(precisions, recalls))
-
-    return torch.trapz(precisions, recalls).float()
+    with plt.rc_context({'backend': 'agg'}):
+        plt.figure()
+        plt.plot(recalls, precisions, 'k')
+        plt.savefig(figure_path)
+        plt.close()
 
 
 def plot_image(image, boxes):
@@ -602,6 +599,28 @@ def save_checkpoint_to_model(checkpoint_path, model_path):
     _ = load_checkpoint(checkpoint_path, model, optimizer, config.LEARNING_RATE, lr_scheduler)
     print("=> Saving model")
     torch.save(model.state_dict(), model_path)
+
+
+def export_model_to_onnx(model_file, onnx_file):
+    import torch.onnx
+    from . import config
+    from .utils import load_checkpoint
+    from .model import YOLOv3
+    import torch.optim as optim
+
+    # A model class instance (class not shown)
+    model = YOLOv3()
+
+    # Load the weights from a file (.pth usually)
+    state_dict = torch.load(model_file)
+
+    # Load the weights now into a model net architecture defined by our class
+    model.load_state_dict(state_dict)
+
+    # Create the right input shape (e.g. for an image)
+    dummy_input = torch.randn(2, 1, 416, 416)
+
+    torch.onnx.export(model, dummy_input, onnx_file)
 
 
 def get_loaders(train_csv_path, validation_csv_path):

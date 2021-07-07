@@ -44,18 +44,29 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
             y[1].to(config.DEVICE),
             y[2].to(config.DEVICE),
         )
-        with torch.cuda.amp.autocast():
+
+        if config.ENABLE_AMP is True:
+            with torch.cuda.amp.autocast():
+                out = model(x)
+                loss = (
+                        loss_fn(out[0], y0, scaled_anchors[0])
+                        + loss_fn(out[1], y1, scaled_anchors[1])
+                        + loss_fn(out[2], y2, scaled_anchors[2])
+                )
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
             out = model(x)
             loss = (
                     loss_fn(out[0], y0, scaled_anchors[0])
                     + loss_fn(out[1], y1, scaled_anchors[1])
                     + loss_fn(out[2], y2, scaled_anchors[2])
             )
-
-        optimizer.zero_grad()
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         # update progress bar
         loop.set_postfix(loss=loss.item())
@@ -73,7 +84,10 @@ def train(patience=2, cooldown=3):
     )
 
     loss_fn = YoloLoss()
-    scaler = torch.cuda.amp.GradScaler()
+    if config.ENABLE_AMP is True:
+        scaler = torch.cuda.amp.GradScaler()
+    else:
+        scaler = None
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=patience, factor=0.5,
                                                         verbose=True, cooldown=cooldown)
     tqdm.write(config.DATASET)
