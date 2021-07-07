@@ -19,6 +19,7 @@ ENABLE_AMP = True
 PIN_MEMORY = True
 LOAD_MODEL = False
 SAVE_MODEL = False
+ENABLE_WANDB = False
 CHECKPOINT_FILE = "checkpoint.pth.tar"
 
 DATASET = 'Data'
