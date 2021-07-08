@@ -11,6 +11,7 @@ torch.backends.cudnn.benchmark = True
 from .model import YOLOv3
 from tqdm.autonotebook import tqdm
 from .utils import (
+    seed_everything,
     average_precision,
     get_evaluation_bboxes,
     save_checkpoint,
@@ -78,7 +79,10 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
         wandb.log({"loss": loss.item(), "avg loss": avg_loss.item()})
 
 
-def train(patience=2, cooldown=3):
+def train(patience=2, cooldown=3, seed_everything=True):
+    if seed_everything:
+        seed_everything()
+
     model = YOLOv3().to(config.DEVICE)
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
@@ -132,10 +136,10 @@ def train(patience=2, cooldown=3):
             iou_threshold=config.MAP_IOU_THRESH,
             box_format="midpoint",
         )
-        AP75 = average_precision(
+        AP70 = average_precision(
             pred_boxes,
             true_boxes,
-            iou_threshold=0.75,
+            iou_threshold=0.70,
             box_format="midpoint",
         )
         AP90 = average_precision(
@@ -144,10 +148,10 @@ def train(patience=2, cooldown=3):
             iou_threshold=0.9,
             box_format="midpoint",
         )
-        mAP = (AP50 + AP75 + AP90) / 3
+        mAP = (AP50 + AP70 + AP90) / 3
         lr_scheduler.step(mAP)
-        tqdm.write(f"AP50: {AP50:.3f}, AP75: {AP75:.3f}, AP90: {AP90:.3f}")
-        wandb.log({'epoch': epoch, 'ap50': AP50, 'ap75': AP75, 'ap90': AP90, 'mAP': mAP,
+        tqdm.write(f"AP50: {AP50:.3f}, AP750: {AP70:.3f}, AP90: {AP90:.3f}")
+        wandb.log({'epoch': epoch, 'ap50': AP50, 'ap70': AP70, 'ap90': AP90, 'mAP': mAP,
                    'lr': optimizer.param_groups[0]['lr']})
 
 

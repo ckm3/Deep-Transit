@@ -380,7 +380,6 @@ def plot_lc_with_bboxes(lc_object, bboxes, ax=None, **kwargs):
     """
     with plt.style.context('grayscale'):
         if ax is None:
-
             fig, ax = plt.subplots(1, figsize=(12, 7), constrained_layout=False)
             ax.plot(lc_object.time.value, lc_object.flux.value, **kwargs)
         else:

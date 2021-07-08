@@ -2,9 +2,6 @@ import torch
 from torchvision import transforms
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-from .utils import seed_everything
-seed_everything()  # If you want deterministic behavior
-# DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 0
 IMAGE_SIZE = 416
 LEARNING_RATE = 3e-5
