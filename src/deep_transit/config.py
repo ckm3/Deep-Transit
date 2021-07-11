@@ -4,7 +4,7 @@ from torchvision import transforms
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 NUM_WORKERS = 0
 IMAGE_SIZE = 416
-LEARNING_RATE = 3e-5
+LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-4
 NUM_EPOCHS = 100
 BATCH_SIZE = 48
@@ -18,7 +18,6 @@ LOAD_MODEL = False
 SAVE_MODEL = False
 ENABLE_WANDB = False
 CHECKPOINT_FILE = "checkpoint.pth.tar"
-
 DATASET = 'Data'
 IMG_DIR = DATASET + "/transit-images/"
 LABEL_DIR = DATASET + "/transit-labels/"

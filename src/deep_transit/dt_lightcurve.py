@@ -88,7 +88,7 @@ def smooth_light_curve(lc_object, N_points):
     return lk.LightCurve(time=t, flux=y)
 
 
-def _light_curve_to_image_array(lc_object, flux_range, exp_time):
+def _light_curve_to_image_array(lc_object, flux_range):
     """
     Convert light curve slice to image array
     Parameters
@@ -96,18 +96,20 @@ def _light_curve_to_image_array(lc_object, flux_range, exp_time):
     lc_object : `~lightkurve.LightCurve` instance
     flux_range : tuple
                 Flux range in 30-day window in format: (flux_min, flux_max)
-    exp_time : float
-                Exposure time of the input light curve
     Returns
     -------
     img_arr : np.ndarray
                 Numpy image array
     """
+    exp_time = np.nanmin(np.diff(lc_object.time.value))
+
     with plt.rc_context({'backend': 'agg'}):
         io_buf = io.BytesIO()
         io_buf.seek(0)
+        plt.ioff()
         fig, ax = plt.subplots(1, figsize=(4.16, 4.16), dpi=100, frameon=False)
         fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+        ax.set_facecolor('white')
         ax.axis('off')
         ax.margins(0, 0)
         if exp_time > 0.00417:
@@ -193,7 +195,7 @@ def _split_light_curve(lc_object, split_time=10, back_step=3):
 
 
 class DeepTransit:
-    def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False, exp_time='auto',
+    def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False,
                  lk_kwargs={}, flatten_kwargs={}):
         """
         Initial function for receiving an light curve object or a time series.
@@ -210,8 +212,6 @@ class DeepTransit:
                     Uncertainty on each flux data point.
         is_flatten : bool
                     True when receiving a flatten light, False will use the built-in flatten method.
-        exp_time : float
-                    exposure time in unit of ``time``.
         lk_kwargs : dict
                     Keyword arguments of `~lightkurve.LightCurve`.
         flatten_kwargs : dict
@@ -237,25 +237,12 @@ class DeepTransit:
         else:
             self.lc = detrend_light_curve(lc_object, **flatten_kwargs)
 
-        if exp_time == 'auto':
-            self.exp_time = np.nanmin(np.diff(self.lc.time.value))
-        elif not isinstance(exp_time, float):
-            raise TypeError("`exp_time` should be a float type value")
+        # if exp_time == 'auto':
+        #     self.exp_time = np.nanmin(np.diff(self.lc.time.value))
+        # elif not isinstance(exp_time, float):
+        #     raise TypeError("`exp_time` should be a float type value")
 
-    def save_sample(self, transit_masks, file_name_base=None):
-        if file_name_base is None:
-            # ToDo: save sample to training Data Folder
-            import string
-            import random
-            file_name_base = ''.join(
-                random.choices(string.ascii_uppercase + string.ascii_lowercase + string.digits, k=8))
 
-        for start_time, stop_time in tqdm(list(_split_light_curve(self.lc))):
-            mask = (self.lc.time.value >= start_time) & (self.lc.time.value <= stop_time)
-            selected_lc = self.lc[mask]
-            if len(selected_lc) < 5 / self.exp_time:
-                continue
-            flatten_lc = detrend_light_curve(selected_lc)
 
     def _splited_lc_generator(self):
         time_initial_index = 0
@@ -265,17 +252,18 @@ class DeepTransit:
             for start_time, stop_time in list(_split_light_curve(lc_block.remove_nans(), split_time=30, back_step=5)):
                 mask = (lc_block.time.value >= start_time) & (lc_block.time.value <= stop_time)
                 selected_lc = lc_block[mask]
-                if len(selected_lc) < 5 / self.exp_time:
+                exp_time = np.nanmin(np.diff(selected_lc.time.value))
+                if len(selected_lc) < 5 / exp_time:
                     continue
                 flux_min, flux_max = np.nanmin(selected_lc.flux.value) * 1.02 - 0.02 * np.nanmax(
                     selected_lc.flux.value), np.nanmax(selected_lc.flux.value)
                 for t0, t1 in _split_light_curve(selected_lc.remove_nans(), split_time=10, back_step=3):
                     mask = (selected_lc.time.value >= t0) & (selected_lc.time.value <= t1)
                     splited_flatten_lc = selected_lc[mask]
-                    if len(splited_flatten_lc) < 1 / self.exp_time:
+                    exp_time = np.nanmin(np.diff(splited_flatten_lc.time.value))
+                    if len(splited_flatten_lc) < 1 / exp_time:
                         continue
-                    img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max),
-                                                          exp_time=self.exp_time)
+                    img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
                     image = config.data_transforms(np.array(Image.fromarray(img_arr).convert("L")))
                     yield splited_flatten_lc, image, flux_min, flux_max
 
@@ -289,22 +277,16 @@ class DeepTransit:
                 return
             yield chunk
 
-    def transit_detection(self, local_model_path, batch_size=2):
+    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=config.CONF_THRESHOLD):
         """
         Searching transit signals from a given light curve.
         Parameters
         ----------
         batch_size : int
-                    batch size for increasing detection speed, especially useful for GPU
+                    Batch size for increasing detection speed, especially useful for GPU
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
-        exp_time : str or float
-                    exposer time (cadence) of the light curve in unit of days.
-                    For example, Kepler long cadence is 0.0204.
-                    Default value is 'auto', which is calculated from the minimum separation of time.
-
-        return_real_unit : bool
-                    if True, this will return a list of bounding boxes,
-                    with unit of real time and flux. The format is [[confidence, x0, y0, width, height]]
+        confidence_threshold : float
+                    Confidence threshold for transit detection. Default value is set by config.CONF_THRESHOLD
 
         Returns
         -------
@@ -317,7 +299,9 @@ class DeepTransit:
         model.eval()
 
         real_unit_bboxes = []
-        rough_length = int(len(self.lc) * self.exp_time / 25 * 4 / batch_size)
+
+        exp_time = np.nanmedian(np.diff(self.lc.time.value))
+        rough_length = int(len(self.lc) * exp_time / 25 * 4 / batch_size)
         warnings.warn('The total number of progress bar is roughly estimated')
         for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
             lc_data = data[:, 0]
@@ -328,7 +312,7 @@ class DeepTransit:
                                               model=model,
                                               iou_threshold=config.NMS_IOU_THRESH,
                                               anchors=config.ANCHORS,
-                                              threshold=config.CONF_THRESHOLD
+                                              threshold=confidence_threshold
                                               )
 
             for index, bboxes in enumerate(predicted_bboxes):
@@ -356,7 +340,7 @@ class DeepTransit:
         # break
         # final_bboxes = sorted(non_max_suppression(real_unit_bboxes, config.NMS_IOU_THRESH, config.CONF_THRESHOLD),
         #                       key=lambda x: x[1], reverse=False)
-        final_bboxes = np.array(non_max_suppression(real_unit_bboxes, config.NMS_IOU_THRESH, config.CONF_THRESHOLD))
+        final_bboxes = np.array(non_max_suppression(real_unit_bboxes, config.NMS_IOU_THRESH, confidence_threshold))
         return final_bboxes
 
 
@@ -473,6 +457,7 @@ def tess_id_to_lc(ticid, product='spoc'):
 
 
 def main():
+
     import matplotlib.pyplot as plt
 
     # search_result = lk.search_lightcurve('KIC 7047824', author='Kepler')
