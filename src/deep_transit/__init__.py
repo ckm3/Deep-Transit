@@ -12,7 +12,7 @@ from .dt_lightcurve import (
     plot_lc_with_bboxes,
     select_lc_from_bboxes)
 from .train import train
-from .utils import save_checkpoint_to_model
+from ._utils import save_checkpoint_to_model
 
 __all__ = [
     "config",

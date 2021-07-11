@@ -11,3 +11,5 @@ _python_cache
 *.pth
 /src/deep_transit/.ipynb_checkpoints
 notebooks/
+build/
+src/Deep_Transit.egg-info/

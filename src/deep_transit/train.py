@@ -9,7 +9,7 @@ import torch.optim as optim
 torch.backends.cudnn.benchmark = True
 from .model import YOLOv3
 from tqdm.autonotebook import tqdm
-from .utils import (
+from ._utils import (
     seed_everything,
     average_precision,
     get_evaluation_bboxes,
@@ -17,7 +17,7 @@ from .utils import (
     load_checkpoint,
     get_loaders,
 )
-from .loss import YoloLoss
+from ._loss import YoloLoss
 
 if config.ENABLE_WANDB:
     import os

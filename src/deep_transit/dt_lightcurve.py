@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from wotan import flatten
 
-from .utils import (
+from ._utils import (
     warning_on_one_line,
     predict_bboxes,
     non_max_suppression,

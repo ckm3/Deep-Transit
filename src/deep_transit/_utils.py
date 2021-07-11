@@ -588,7 +588,7 @@ def save_checkpoint_to_model(checkpoint_path, model_path):
     model_path : str
     """
     from . import config
-    from .utils import load_checkpoint
+    from ._utils import load_checkpoint
     from .model import YOLOv3
     import torch.optim as optim
 
@@ -604,7 +604,7 @@ def save_checkpoint_to_model(checkpoint_path, model_path):
 def export_model_to_onnx(model_file, onnx_file):
     import torch.onnx
     from . import config
-    from .utils import load_checkpoint
+    from ._utils import load_checkpoint
     from .model import YOLOv3
     import torch.optim as optim
 
