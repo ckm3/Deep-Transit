@@ -2,7 +2,6 @@
 Main file for training Yolo models on Pascal VOC and COCO dataset
 """
 
-
 from . import config
 import torch
 import torch.optim as optim
@@ -22,8 +21,10 @@ from .loss import YoloLoss
 
 if config.ENABLE_WANDB:
     import os
+
     os.environ["WANDB_MODE"] = "offline"
     import wandb
+
     wandb.init(project='deep_transit',
                config=dict(
                    LEARNING_RATE=config.LEARNING_RATE,
@@ -34,8 +35,10 @@ else:
     class wandb:
         @classmethod
         def log(*args, **kwargs): pass
+
         @classmethod
         def watch(*args, **kwargs): pass
+
 
 def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
     loop = tqdm(train_loader)
@@ -79,8 +82,8 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
         wandb.log({"loss": loss.item(), "avg loss": avg_loss.item()})
 
 
-def train(patience=2, cooldown=3, seed_everything=True):
-    if seed_everything:
+def train(patience=2, cooldown=3, enable_seed_everything=True):
+    if enable_seed_everything:
         seed_everything()
 
     model = YOLOv3().to(config.DEVICE)
