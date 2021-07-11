@@ -418,7 +418,7 @@ def predict_bboxes(image, model, iou_threshold, threshold, anchors,
         )
         for idx, (box) in enumerate(boxes_scale_i):
             bboxes[idx] += box
-
+            
     nms_boxes = []
     for lc_index in range(batch_size):
         nms_boxes.append(non_max_suppression(
@@ -630,7 +630,7 @@ def get_loaders(train_csv_path, validation_csv_path):
     image_size = config.IMAGE_SIZE
     train_dataset = YOLODataset(
         train_csv_path,
-        transform=config.data_transforms,
+        transform=config.data_transforms(),
         S=[image_size // 32, image_size // 16, image_size // 8],
         img_dir=config.IMG_DIR,
         label_dir=config.LABEL_DIR,
@@ -638,7 +638,7 @@ def get_loaders(train_csv_path, validation_csv_path):
     )
     validation_dataset = YOLODataset(
         validation_csv_path,
-        transform=config.data_transforms,
+        transform=config.data_transforms(),
         S=[image_size // 32, image_size // 16, image_size // 8],
         img_dir=config.IMG_DIR,
         label_dir=config.LABEL_DIR,
