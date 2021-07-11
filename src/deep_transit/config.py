@@ -1,11 +1,15 @@
 import torch
 from torchvision import transforms
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-"""
-str: Device of your computer. It should be "cuda" for GPU or "cpu" or CPU.
-Default we will automatically choose GPU or CPU based on whether you CUDA is available.
-"""
+FRAMEWORK="pytorch" # megengine
+if FRAMEWORK=="pytorch":
+    """
+    str: Device of your computer. It should be "cuda" for GPU or "cpu" or CPU.
+    Default we will automatically choose GPU or CPU based on whether you CUDA is available.
+    """
+    import torch
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 IMAGE_SIZE = 416
 """
 int: Image size of you training data set
@@ -90,9 +94,14 @@ ANCHORS = [
     [(0.02, 0.3)],
 ]
 
-data_transforms = transforms.Compose([
+def data_transforms():
+    if FRAMEWORK == "pytorch":
+        from torchvision import transforms
+        return transforms.Compose([
     transforms.ToTensor(),
 ])
+    else:
+        return None
 
 model_config = [
     (32, 3, 1),

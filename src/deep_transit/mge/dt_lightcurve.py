@@ -1,7 +1,6 @@
 import io
 
-import torch
-from . import config
+from .. import config
 import warnings
 import itertools
 
@@ -10,19 +9,18 @@ from PIL import Image
 from tqdm import tqdm
 import argparse
 
+import megengine as mge
 import lightkurve as lk
 from .model import YOLOv3
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from wotan import flatten
 
-from ._utils import (
+from .utils import (
     warning_on_one_line,
     predict_bboxes,
     non_max_suppression,
     load_model)
-
-torch.set_flush_denormal(True)  # Fixing a bug caused by Intel CPU
 
 warnings.formatwarning = warning_on_one_line  # Raise my own warns
 
@@ -32,23 +30,21 @@ def detrend_light_curve(lc_object, window_length=0.5, edge_cutoff=0.5, break_tol
     """
     Detrend a light curve for upcoming transit searching with wotan biweight method and sigma clipping
     https://github.com/hippke/wotan
-
     Parameters
     ----------
-    lc_object: `~lightkurve.LightCurve` instance
+    lc_object : `~lightkurve.LightCurve` instance
                 Input light curve object
-    window_length: float
+    window_length : float
                 The length of the filter window in units of ``time``, default is 0.5
-    edge_cutoff: float
+    edge_cutoff : float
                 Length (in units of time) to be cut off each edge, default is 0.5
-    break_tolerance: float
+    break_tolerance : float
                 Split into segments at breaks longer than that, default is 0.5
-    cval: float
+    cval : float
                 Tuning parameter for the robust estimators, default is 5.0
-    sigma_upper: float
+    sigma_upper : float
 
-    sigma_lower: float
-
+    sigma_lower : float
     Returns
     -------
     flatten_lc : `~lightkurve.LightCurve` instance
@@ -137,7 +133,6 @@ def _light_curve_to_image_array(lc_object, flux_range):
 def _bounding_box_to_time_flux(lc_object, bboxes, flux_range):
     """
     Convert image pixel value to time and flux
-
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
@@ -168,7 +163,6 @@ def _bounding_box_to_time_flux(lc_object, bboxes, flux_range):
 def _split_light_curve(lc_object, split_time=10, back_step=3):
     """
     Split a light curve to some slices with indicated time interval and step
-
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
@@ -200,19 +194,10 @@ def _split_light_curve(lc_object, split_time=10, back_step=3):
 
 
 class DeepTransit:
-    """
-    The core class of transit detection.
-
-    Attributes
-    ----------
-    lc : `~lightkurve.LightCurve`
-        
-    """
     def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False,
                  lk_kwargs={}, flatten_kwargs={}):
         """
         Initial function for receiving an light curve object or a time series.
-
         Parameters
         ----------
         lc_object : `~lightkurve.LightCurve` instance
@@ -251,13 +236,6 @@ class DeepTransit:
         else:
             self.lc = detrend_light_curve(lc_object, **flatten_kwargs)
 
-        # if exp_time == 'auto':
-        #     self.exp_time = np.nanmin(np.diff(self.lc.time.value))
-        # elif not isinstance(exp_time, float):
-        #     raise TypeError("`exp_time` should be a float type value")
-
-
-
     def _splited_lc_generator(self):
         time_initial_index = 0
         for time_block_index in np.append((np.diff(self.lc.time.value) > 10).nonzero()[0], len(self.lc) - 1):
@@ -278,7 +256,7 @@ class DeepTransit:
                     if len(splited_flatten_lc) < 1 / exp_time:
                         continue
                     img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
-                    image = config.data_transforms()(np.array(Image.fromarray(img_arr).convert("L")))
+                    image = np.expand_dims(np.array(Image.fromarray(img_arr).convert("L")), axis=0)
                     yield splited_flatten_lc, image, flux_min, flux_max
 
     def _data_loader(self, batch_size=1):
@@ -294,7 +272,6 @@ class DeepTransit:
     def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=config.CONF_THRESHOLD):
         """
         Searching transit signals from a given light curve.
-
         Parameters
         ----------
         batch_size : int
@@ -309,7 +286,7 @@ class DeepTransit:
                     An (N, 5) shape numpy.ndarray of bounding boxes.
         """
 
-        model = YOLOv3().to(config.DEVICE)
+        model = YOLOv3()
         load_model(local_model_path, model)
         model.eval()
 
@@ -321,8 +298,8 @@ class DeepTransit:
         for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
-            image_data = torch.tensor(np.stack(data[:, 1]), device=config.DEVICE)
-
+            image_data = mge.tensor(np.stack(data[:, 1]))
+            print(image_data.shape)
             predicted_bboxes = predict_bboxes(image_data,
                                               model=model,
                                               iou_threshold=config.NMS_IOU_THRESH,
@@ -341,14 +318,11 @@ class DeepTransit:
 def plot_lc_with_bboxes(lc_object, bboxes, ax=None, **kwargs):
     """
     Plot light curve with bounding boxes
-
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
-
     bboxes : list or np.ndarray
                 Bounding boxes in shape (N, 5)
-
     ax : `~matplotlib.pyplot.axis` instance
                 Axis to plot to. If None, create a new one.
     kwargs : dict
@@ -440,24 +414,13 @@ def kepler_id_to_lc(kicid):
     return lk.LightCurveCollection(lc_collection)
 
 
-def tess_id_to_lc(ticid, product='spoc'):
-    from glob import glob
-    lc_collection = []
-    if product == 'spoc':
-        lc_file_paths = glob(f'/home/ckm/.lightkurve-cache/mastDownload/TESS/*{ticid}*s/*lc.fits')
-    elif product == 'qlp':
-        lc_file_paths = glob(f'/home/ckm/.lightkurve-cache/mastDownload/HLSP/*qlp*{ticid}*/*lc.fits')
-
-    for i in lc_file_paths:
-        lc_collection.append(lk.read(i).remove_nans())
-    return lk.LightCurveCollection(lc_collection)
-
 
 def main():
     parser = argparse.ArgumentParser(description='demo for lc detection')
     parser.add_argument('-lc', type=str, default='11446443', help='light curve number of KIC, used as src')
-    parser.add_argument('-m', type=str, help='model path, will download if empty' )
-    parser.add_argument('-b', type=str, help='backend of model ', default='pytorch')
+    parser.add_argument('-m', '--model_path', type=str, help='model path, will download if empty' )
+    parser.add_argument('-b', '--batch', type=int, help='batchsize used to inference', default=3)
+    parser.add_argument('--backend', type=str, help='backend of model ', default='pytorch')
     args = parser.parse_args()
     import matplotlib.pyplot as plt
     search_result = lk.search_lightcurve('KIC {}'.format(args.lc), author='Kepler')
@@ -465,7 +428,7 @@ def main():
     lc = lc[lc.time.value < 135]
     dt = DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper':3})
     flat_lc = detrend_light_curve(lc, window_length=0.5)
-    bboxes = dt.transit_detection('/home/liujunjie/ckm/Deep-Transit/src/checkpoint.pth.tar_0.tar', batch_size=3)
+    bboxes = dt.transit_detection('/home/liujunjie/ckm/Deep-Transit/src/ckpt_deep_transit_5.pkl', batch_size=args.batch)
     fig, ax = plt.subplots()
     ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax, lw=1)
     plt.show()

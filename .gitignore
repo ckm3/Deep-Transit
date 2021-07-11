@@ -13,3 +13,4 @@ _python_cache
 notebooks/
 build/
 src/Deep_Transit.egg-info/
+*.pkl
