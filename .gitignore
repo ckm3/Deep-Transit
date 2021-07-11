@@ -5,3 +5,9 @@
 *.pyc
 _python_cache
 .vscode
+*.ipynb
+.idea
+*.egg
+*.pth
+/src/deep_transit/.ipynb_checkpoints
+notebooks/
