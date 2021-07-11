@@ -27,7 +27,7 @@ jobs:
         pip install torch torchvision lightkurve>=2.0 wotan pytest
     - name: Install package
       run: |
-        pip install -e .
+        python setup.py install
     - name: Test with pytest
       run: |
         pip install pytest

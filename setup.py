@@ -3,12 +3,12 @@
 import setuptools
 
 setuptools.setup(
-    name="deep_transit",
+    name="Deep-Transit",
     version="0.0.1",
     author="Kaiming Cui",
     author_email="cuikaiming15@mails.ucas.edu.cn",
     description="Transit detection with object detection algorithm",
-    packages=setuptools.find_packages(include=['deep_transit', 'deep_transit.*']),
+    packages=setuptools.find_packages(where="src"),
     # long_description=,
     # long_description_content_type="text/markdown",
     package_dir={"": "src"},
@@ -23,5 +23,5 @@ setuptools.setup(
         "Topic :: Scientific/Engineering :: Astronomy",
         "Topic :: Scientific/Engineering :: Physics"],
     python_requires='>=3.6.1',
-    install_requires=["lightkurve>=2.0", "torch", "torchvision", "wotan"],
+    install_requires=["torch", "torchvision", "lightkurve>=2.0", "wotan"],
 )
