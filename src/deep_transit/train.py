@@ -83,6 +83,18 @@ def train_fn(train_loader, model, optimizer, loss_fn, scaler, scaled_anchors):
 
 
 def train(patience=2, cooldown=3, enable_seed_everything=True):
+    """
+    Function for training your own data set.
+
+    Parameters
+    ----------
+    patience: int
+            The parameter of ~torch.optim.lr_scheduler.ReduceLROnPlateau
+    cooldown: int
+            The parameter of ~torch.optim.lr_scheduler.ReduceLROnPlateau
+    enable_seed_everything: bool
+            If true, the training will be deterministic
+    """
     if enable_seed_everything:
         seed_everything()
 

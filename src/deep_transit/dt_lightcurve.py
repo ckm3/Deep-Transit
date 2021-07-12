@@ -31,21 +31,23 @@ def detrend_light_curve(lc_object, window_length=0.5, edge_cutoff=0.5, break_tol
     """
     Detrend a light curve for upcoming transit searching with wotan biweight method and sigma clipping
     https://github.com/hippke/wotan
+
     Parameters
     ----------
-    lc_object : `~lightkurve.LightCurve` instance
+    lc_object: `~lightkurve.LightCurve` instance
                 Input light curve object
-    window_length : float
+    window_length: float
                 The length of the filter window in units of ``time``, default is 0.5
-    edge_cutoff : float
+    edge_cutoff: float
                 Length (in units of time) to be cut off each edge, default is 0.5
-    break_tolerance : float
+    break_tolerance: float
                 Split into segments at breaks longer than that, default is 0.5
-    cval : float
+    cval: float
                 Tuning parameter for the robust estimators, default is 5.0
-    sigma_upper : float
+    sigma_upper: float
 
-    sigma_lower : float
+    sigma_lower: float
+
     Returns
     -------
     flatten_lc : `~lightkurve.LightCurve` instance
@@ -134,6 +136,7 @@ def _light_curve_to_image_array(lc_object, flux_range):
 def _bounding_box_to_time_flux(lc_object, bboxes, flux_range):
     """
     Convert image pixel value to time and flux
+
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
@@ -164,6 +167,7 @@ def _bounding_box_to_time_flux(lc_object, bboxes, flux_range):
 def _split_light_curve(lc_object, split_time=10, back_step=3):
     """
     Split a light curve to some slices with indicated time interval and step
+
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
@@ -195,10 +199,19 @@ def _split_light_curve(lc_object, split_time=10, back_step=3):
 
 
 class DeepTransit:
+    """
+    The core class of transit detection.
+
+    Attributes
+    ----------
+    lc : `~lightkurve.LightCurve`
+        
+    """
     def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False,
                  lk_kwargs={}, flatten_kwargs={}):
         """
         Initial function for receiving an light curve object or a time series.
+
         Parameters
         ----------
         lc_object : `~lightkurve.LightCurve` instance
@@ -280,6 +293,7 @@ class DeepTransit:
     def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=config.CONF_THRESHOLD):
         """
         Searching transit signals from a given light curve.
+
         Parameters
         ----------
         batch_size : int
@@ -347,11 +361,14 @@ class DeepTransit:
 def plot_lc_with_bboxes(lc_object, bboxes, ax=None, **kwargs):
     """
     Plot light curve with bounding boxes
+
     Parameters
     ----------
     lc_object : `~lightkurve.LightCurve` instance
+
     bboxes : list or np.ndarray
                 Bounding boxes in shape (N, 5)
+
     ax : `~matplotlib.pyplot.axis` instance
                 Axis to plot to. If None, create a new one.
     kwargs : dict

@@ -581,7 +581,8 @@ def load_model(model_file, model):
 
 def save_checkpoint_to_model(checkpoint_path, model_path):
     """
-    Save trained checkpoint to models
+    Save trained a checkpoint to a model
+
     Parameters
     ----------
     checkpoint_path : str
