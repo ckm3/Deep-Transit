@@ -1,6 +1,3 @@
-import torch
-from torchvision import transforms
-
 FRAMEWORK="pytorch" # megengine
 if FRAMEWORK=="pytorch":
     """
@@ -101,7 +98,8 @@ def data_transforms():
     transforms.ToTensor(),
 ])
     else:
-        return None
+        def bypass(x):return x
+        return bypass
 
 model_config = [
     (32, 3, 1),

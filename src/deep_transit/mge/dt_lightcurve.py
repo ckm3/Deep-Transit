@@ -1,6 +1,4 @@
 import io
-
-from .. import config
 import warnings
 import itertools
 
@@ -9,18 +7,12 @@ from PIL import Image
 from tqdm import tqdm
 import argparse
 
-import megengine as mge
 import lightkurve as lk
-from .model import YOLOv3
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from wotan import flatten
-
-from .utils import (
-    warning_on_one_line,
-    predict_bboxes,
-    non_max_suppression,
-    load_model)
+from .backend import MegengineBackend
+from ..common_utils import warning_on_one_line
 
 warnings.formatwarning = warning_on_one_line  # Raise my own warns
 
@@ -269,7 +261,7 @@ class DeepTransit:
                 return
             yield chunk
 
-    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=config.CONF_THRESHOLD):
+    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=None, nms_iou_threshold=None, device_str=None):
         """
         Searching transit signals from a given light curve.
         Parameters
@@ -285,33 +277,22 @@ class DeepTransit:
         final_bboxes : np.ndarray
                     An (N, 5) shape numpy.ndarray of bounding boxes.
         """
-
-        model = YOLOv3()
-        load_model(local_model_path, model)
-        model.eval()
-
+        backend = MegengineBackend()
+        backend.load_model(device_str, local_model_path)
         real_unit_bboxes = []
-
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
         rough_length = int(len(self.lc) * exp_time / 25 * 4 / batch_size)
         warnings.warn('The total number of progress bar is roughly estimated')
         for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
-            image_data = mge.tensor(np.stack(data[:, 1]))
-            print(image_data.shape)
-            predicted_bboxes = predict_bboxes(image_data,
-                                              model=model,
-                                              iou_threshold=config.NMS_IOU_THRESH,
-                                              anchors=config.ANCHORS,
-                                              threshold=confidence_threshold
-                                              )
-
+            predicted_bboxes = backend.inference(np.stack(
+                data[:, 1]), nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold)
             for index, bboxes in enumerate(predicted_bboxes):
                 predicted_bboxes_in_real_unit = _bounding_box_to_time_flux(lc_data[index], bboxes,
                                                                            (flux_min[index], flux_max[index]))
                 real_unit_bboxes += predicted_bboxes_in_real_unit
-        final_bboxes = np.array(non_max_suppression(real_unit_bboxes, config.NMS_IOU_THRESH, confidence_threshold))
+        final_bboxes = np.array(backend.nms(real_unit_bboxes, nms_iou_threshold=nms_iou_threshold,  confidence_threshold=confidence_threshold))
         return final_bboxes
 
 
@@ -389,32 +370,6 @@ def select_lc_from_bboxes(lc_object, bboxes, bboxes_format='LC'):
                     lc_object.flux.value >= y0) & (lc_object.flux.value <= y1)
     return lc_object[range_logic]
 
-
-def __show_light_curve_image(image_array):
-    """
-    Private debugging function
-    """
-    from PIL import Image
-    img_arr = np.array(Image.fromarray(image_array).convert("L"))
-    fig, ax = plt.subplots(1)
-    ax.imshow(img_arr, cmap='binary_r', origin='upper')
-    plt.show()
-
-
-def kepler_id_to_lc(kicid):
-    from glob import iglob
-    # prepare the kicid
-
-    # fits file location
-    lc_fits_folder_path = f'/home/ckm/.lightkurve-cache/mastDownload/Kepler/*{kicid}*'
-
-    lc_collection = []
-    for i in iglob(lc_fits_folder_path + '/*llc.fits'):
-        lc_collection.append(lk.read(i).remove_nans())
-    return lk.LightCurveCollection(lc_collection)
-
-
-
 def main():
     parser = argparse.ArgumentParser(description='demo for lc detection')
     parser.add_argument('-lc', type=str, default='11446443', help='light curve number of KIC, used as src')
@@ -428,7 +383,7 @@ def main():
     lc = lc[lc.time.value < 135]
     dt = DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper':3})
     flat_lc = detrend_light_curve(lc, window_length=0.5)
-    bboxes = dt.transit_detection('/home/liujunjie/ckm/Deep-Transit/src/ckpt_deep_transit_5.pkl', batch_size=args.batch)
+    bboxes = dt.transit_detection('/home/liujunjie/ckm/Deep-Transit/src/ckpt_deep_transit_5_v2.pkl', batch_size=args.batch)
     fig, ax = plt.subplots()
     ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax, lw=1)
     plt.show()

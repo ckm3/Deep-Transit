@@ -401,9 +401,13 @@ def plot_image(image, boxes):
 
 
 def predict_bboxes(image, model, iou_threshold, threshold, anchors,
-                   device=config.DEVICE):
-    # image = config.data_transforms(np.array(Image.fromarray(image_array).convert("L"))).to(device)
-    # image = torch.unsqueeze(image.to(device), 0)
+                   device_str):
+    if len(image.shape) == 3:
+        image = np.expand_dims(image, axis=1).astype('float32')
+    if  not isinstance(image, torch.Tensor):
+        image = torch.tensor(image)
+        if device_str:
+            image = image.to(device_str)
 
     with torch.no_grad():
         predictions = model(image)
@@ -412,7 +416,7 @@ def predict_bboxes(image, model, iou_threshold, threshold, anchors,
     bboxes = [[] for _ in range(batch_size)]
     for i in range(3):
         S = predictions[i].shape[2]
-        anchor = torch.tensor([*anchors[i]], device=device) * S
+        anchor = torch.tensor([*anchors[i]], device=device_str) * S
         boxes_scale_i = cells_to_bboxes(
             predictions[i], anchor, S=S, is_preds=True
         )
@@ -554,7 +558,10 @@ def save_checkpoint(model, optimizer, epoch, lr_scheduler, file_path="checkpoint
         "epoch": epoch,
         "state_dict": model.state_dict(),
         "optimizer": optimizer.state_dict(),
-        "scheduler_state": lr_scheduler.state_dict()
+        "scheduler_state": lr_scheduler.state_dict(),
+        "anchors" : config.ANCHORS,
+        "nms_iou_threshold" : config.NMS_IOU_THRESH,
+        "confidence_threshold" : config.CONF_THRESHOLD,
     }
     torch.save(checkpoint, file_path)
 
@@ -573,10 +580,21 @@ def load_checkpoint(checkpoint_file, model, optimizer, lr, lr_scheduler):
     #     param_group["lr"] = lr
     return epoch
 
-
-def load_model(model_file, model):
+def load_model(model_file, model, device_str=None):
     tqdm.write(f"Loading Model: {model_file}")
-    model.load_state_dict(torch.load(model_file, map_location=config.DEVICE))
+    if device_str is not None:
+        ckpt = torch.load(model_file, map_location=device_str)
+    else:
+        ckpt = torch.load(model_file)
+    if 'state_dict' in ckpt.keys():
+        model.load_state_dict(ckpt['state_dict'])
+        return model, {key:ckpt[key] for key in ckpt.keys() if key != 'state_dict'}
+    else:
+        # compatiable with bare dump
+        model.load_state_dict(ckpt)
+        return  model, {"anchors" : config.ANCHORS,
+                        "nms_iou_threshold" : config.NMS_IOU_THRESH,
+                        "confidence_threshold" : config.CONF_THRESHOLD}
 
 
 def save_checkpoint_to_model(checkpoint_path, model_path):
@@ -599,7 +617,11 @@ def save_checkpoint_to_model(checkpoint_path, model_path):
                                                         cooldown=3)
     _ = load_checkpoint(checkpoint_path, model, optimizer, config.LEARNING_RATE, lr_scheduler)
     print("=> Saving model")
-    torch.save(model.state_dict(), model_path)
+    torch.save({
+        'state_dict': model.state_dict(),
+        "anchors": config.ANCHORS,
+        "nms_iou_threshold": config.NMS_IOU_THRESH,
+        "confidence_threshold": config.CONF_THRESHOLD}, model_path)
 
 
 def export_model_to_onnx(model_file, onnx_file):

@@ -63,7 +63,10 @@ def train(patience=2, cooldown=3, enable_seed_everything=True):
         mge.save(
                     {
                         "epoch": epoch,
-                        "state_dict": model.state_dict(),
+                        "state_dict" : model.state_dict(),
+                        "anchors" : config.ANCHORS,
+                        "nms_iou_threshold" : config.NMS_IOU_THRESH,
+                        "confidence_threshold" : config.CONF_THRESHOLD,
                     },
                     './ckpt_deep_transit_{}.pkl'.format(epoch)
                 )
