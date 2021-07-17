@@ -1,6 +1,5 @@
 import io
 
-import torch
 from . import config
 import warnings
 import itertools
@@ -11,18 +10,10 @@ from tqdm import tqdm
 import argparse
 
 import lightkurve as lk
-from .model import YOLOv3
 import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 from wotan import flatten
-
-from ._utils import (
-    warning_on_one_line,
-    predict_bboxes,
-    non_max_suppression,
-    load_model)
-
-torch.set_flush_denormal(True)  # Fixing a bug caused by Intel CPU
+from .common_utils import warning_on_one_line
 
 warnings.formatwarning = warning_on_one_line  # Raise my own warns
 
@@ -278,7 +269,7 @@ class DeepTransit:
                     if len(splited_flatten_lc) < 1 / exp_time:
                         continue
                     img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
-                    image = config.data_transforms()(np.array(Image.fromarray(img_arr).convert("L")))
+                    image = np.array(Image.fromarray(img_arr).convert("L"))
                     yield splited_flatten_lc, image, flux_min, flux_max
 
     def _data_loader(self, batch_size=1):
@@ -291,7 +282,7 @@ class DeepTransit:
                 return
             yield chunk
 
-    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=config.CONF_THRESHOLD):
+    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=None, nms_iou_threshold=None, device_str=None, backend='pytorch'):
         """
         Searching transit signals from a given light curve.
 
@@ -308,33 +299,28 @@ class DeepTransit:
         final_bboxes : np.ndarray
                     An (N, 5) shape numpy.ndarray of bounding boxes.
         """
-
-        model = YOLOv3().to(config.DEVICE)
-        load_model(local_model_path, model)
-        model.eval()
-
+        if backend == 'pytorch':
+            from .backend import PytorchBackend
+            backend = PytorchBackend()
+        else:
+            assert backend == 'megengine'
+            from.mge.backend import MegengineBackend
+            backend = MegengineBackend()
+        backend.load_model(device_str, local_model_path)
         real_unit_bboxes = []
-
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
         rough_length = int(len(self.lc) * exp_time / 25 * 4 / batch_size)
         warnings.warn('The total number of progress bar is roughly estimated')
         for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
-            image_data = torch.tensor(np.stack(data[:, 1]), device=config.DEVICE)
-
-            predicted_bboxes = predict_bboxes(image_data,
-                                              model=model,
-                                              iou_threshold=config.NMS_IOU_THRESH,
-                                              anchors=config.ANCHORS,
-                                              threshold=confidence_threshold
-                                              )
-
+            predicted_bboxes = backend.inference(np.stack(
+                data[:, 1]), nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold, device_str=device_str)
             for index, bboxes in enumerate(predicted_bboxes):
                 predicted_bboxes_in_real_unit = _bounding_box_to_time_flux(lc_data[index], bboxes,
                                                                            (flux_min[index], flux_max[index]))
                 real_unit_bboxes += predicted_bboxes_in_real_unit
-        final_bboxes = np.array(non_max_suppression(real_unit_bboxes, config.NMS_IOU_THRESH, confidence_threshold))
+        final_bboxes = np.array(backend.nms(real_unit_bboxes, nms_iou_threshold=nms_iou_threshold,  confidence_threshold=confidence_threshold))
         return final_bboxes
 
 
@@ -456,8 +442,12 @@ def tess_id_to_lc(ticid, product='spoc'):
 def main():
     parser = argparse.ArgumentParser(description='demo for lc detection')
     parser.add_argument('-lc', type=str, default='11446443', help='light curve number of KIC, used as src')
-    parser.add_argument('-m', type=str, help='model path, will download if empty' )
-    parser.add_argument('-b', type=str, help='backend of model ', default='pytorch')
+    parser.add_argument('-m', '--model_path', type=str, help='model path, will download if empty' )
+    parser.add_argument('-b', '--batch', type=int, help='batchsize used to inference', default=3)
+    parser.add_argument('--backend', type=str, help='backend of model, use pytorch/megengine', default='pytorch')
+    parser.add_argument('-d', '--device', type=str, help='runtime device of backend', default=None)
+    parser.add_argument('--nms_iou_threshold', type=float, help='nms iou  threshold', default=None)
+    parser.add_argument('--confidence_threshold', type=float, help='confidence threshold', default=None)
     args = parser.parse_args()
     import matplotlib.pyplot as plt
     search_result = lk.search_lightcurve('KIC {}'.format(args.lc), author='Kepler')
@@ -465,10 +455,12 @@ def main():
     lc = lc[lc.time.value < 135]
     dt = DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper':3})
     flat_lc = detrend_light_curve(lc, window_length=0.5)
-    bboxes = dt.transit_detection('/home/liujunjie/ckm/Deep-Transit/src/checkpoint.pth.tar_0.tar', batch_size=3)
+    bboxes = dt.transit_detection(args.model_path, batch_size=args.batch,
+                                  nms_iou_threshold=args.nms_iou_threshold, confidence_threshold=args.confidence_threshold, device_str=args.device, backend=args.backend)
     fig, ax = plt.subplots()
     ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax, lw=1)
     plt.show()
+
 
 
 if __name__ == '__main__':

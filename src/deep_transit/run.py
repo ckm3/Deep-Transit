@@ -42,13 +42,10 @@ def show_test_ground_truth():
         boxes = []
         for i in range(y[0].shape[1]):
             anchor = scaled_anchors[i]
-            # print(anchor.shape)
-            # print(y[i].shape)
             boxes += cells_to_bboxes(
                 y[i], is_preds=False, S=y[i].shape[2], anchors=anchor
             )[0]
         boxes = nms(boxes, iou_threshold=1, threshold=0.1, box_format="midpoint")
-        # print(boxes)
         plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
 
 

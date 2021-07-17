@@ -7,8 +7,6 @@ import numpy as np
 import tqdm
 from collections import Counter
 
-def warning_on_one_line(message, category, filename, lineno, line=None):
-    return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
 
 def iou_width_height(boxes1, boxes2):
     """
@@ -146,7 +144,11 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="midpoint")
     index_tensor = F.vision.nms(mid_bboxes[..., 1:], mid_bboxes[..., 0], iou_threshold)
     return bboxes[index_tensor].tolist()
 
+
 def predict_bboxes(image, model, iou_threshold, threshold, anchors):
+    if len(image.shape) == 3:
+        image = np.expand_dims(image, axis=1)
+
     model.eval()
     predictions = model(image)
 
@@ -160,7 +162,6 @@ def predict_bboxes(image, model, iou_threshold, threshold, anchors):
             )
         for idx, (box) in enumerate(boxes_scale_i):
             bboxes[idx] += box.tolist()
-    print(len(bboxes[0]))
     nms_boxes = []
     for lc_index in range(batch_size):
         nms_boxes.append(non_max_suppression(
@@ -340,3 +341,4 @@ def load_model(model_file, model):
     tqdm.tqdm.write(f"Loading Model: {model_file} with megengine")
     ckpt = mge.load(model_file)
     model.load_state_dict(ckpt['state_dict'])
+    return model, {key:ckpt[key] for key in ckpt.keys() if key != 'state_dict'}

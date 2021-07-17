@@ -113,7 +113,6 @@ def test_transit():
                 y[i], is_preds=False, S=y[i].shape[2], anchors=anchor
             )[0]
         boxes = nms(boxes, iou_threshold=0.9, threshold=0.5, box_format="midpoint")
-        # print(x[0].shape)
         plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
         # break
 
