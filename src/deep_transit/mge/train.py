@@ -18,6 +18,7 @@ train_loader, validation_loader = get_loaders(
     )
 
 def train_fn(train_loader, model, optimizer,  loss_fn, scaler, scaled_anchors, gm):
+    model.train()
     loop = tqdm(train_loader)
     avg_loss = -1
     for batch_idx, (x, y) in enumerate(loop):
@@ -38,6 +39,7 @@ def train_fn(train_loader, model, optimizer,  loss_fn, scaler, scaled_anchors, g
 def train(patience=2, cooldown=3, enable_seed_everything=True):
 
     model = YOLOv3()
+    model.train()
     optimizer = optim.Adam(
         model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY
     )

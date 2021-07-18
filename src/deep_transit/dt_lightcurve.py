@@ -1,6 +1,5 @@
 import io
 
-from . import config
 import warnings
 import itertools
 
@@ -292,7 +291,7 @@ class DeepTransit:
                     Batch size for increasing detection speed, especially useful for GPU
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
         confidence_threshold : float
-                    Confidence threshold for transit detection. Default value is set by config.CONF_THRESHOLD
+                    Confidence threshold for transit detection. Default value is set from model
 
         Returns
         -------
