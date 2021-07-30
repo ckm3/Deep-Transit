@@ -9,7 +9,7 @@ if FRAMEWORK=="pytorch":
 
 IMAGE_SIZE = 416
 """
-int: Image size of you training data set
+int: Image size of you training data set, should be the multiples of 32
 """
 LEARNING_RATE = 1e-4
 """

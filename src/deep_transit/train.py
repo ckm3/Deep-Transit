@@ -89,9 +89,9 @@ def train(patience=2, cooldown=3, enable_seed_everything=True):
     Parameters
     ----------
     patience: int
-            The parameter of ~torch.optim.lr_scheduler.ReduceLROnPlateau
+            The parameter of `~torch.optim.lr_scheduler.ReduceLROnPlateau`
     cooldown: int
-            The parameter of ~torch.optim.lr_scheduler.ReduceLROnPlateau
+            The parameter of `~torch.optim.lr_scheduler.ReduceLROnPlateau`
     enable_seed_everything: bool
             If true, the training will be deterministic
     """

@@ -33,6 +33,7 @@ release = '0.0.1'
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "nbsphinx"
@@ -52,7 +53,15 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'sphinx_rtd_theme'
+# html_theme = 'sphinx_rtd_theme'
+html_theme = 'pydata_sphinx_theme'
+
+
+html_theme_options = {
+    "external_links": [],
+    "github_url": "https://github.com/ckm3/Deep-Transit",
+}
+
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -64,3 +73,14 @@ nbsphinx_prompt_width = '0' # no prompts in nbsphinx
 exclude_patterns = ['.ipynb_checkpoints/*']
 
 autodoc_member_order = 'bysource'
+
+default_role = 'py:obj'
+
+intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
+                       'numpy': ('https://docs.scipy.org/doc/numpy/', None),
+                       'scipy': ('https://docs.scipy.org/doc/scipy/reference', None),
+                       'matplotlib': ('https://matplotlib.org', None),
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+                       'astropy': ('https://docs.astropy.org/en/latest/', None),
+                       'lightkurve': ('https://docs.lightkurve.org/', None),
+                       'torch': ('https://pytorch.org/docs/stable/', None)}
