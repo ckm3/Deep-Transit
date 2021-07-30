@@ -4,11 +4,14 @@ from .utils import load_model, predict_bboxes, non_max_suppression
 
 class MegengineBackend:
     def __init__(self) -> None:
+        def bypass(x):return x
+        self.trans = bypass
         pass
 
     def load_model(self, device_str, model_path):
         model = YOLOv3()
         self.model, self.model_config = load_model(model_path, model)
+        self.model.eval()
 
     def inference(self, input, nms_iou_threshold, confidence_threshold, device_str):
         if nms_iou_threshold is None:

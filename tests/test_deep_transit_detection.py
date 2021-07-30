@@ -28,4 +28,19 @@ def test_detection():
     assert np.all((bboxes[:, (0,2,3,4)]<=1)&(bboxes[:, (0,2,3,4)]>=0)), "0, 2-4 shold be 0 to 1"
     assert np.all((bboxes[:,0]<=1)&(bboxes[:,0]>=0.99)), "confidence score shold be 0 to 1"
    
+def test_detection_mge():
+    import os
+    lc = kepler_id_to_lc(11446443).stitch()
+    lc.sort('time')
+    lc = lc[lc.time.value < 150]
+
+    dt_obj = dt.DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper': 3})
+    if not os.path.exists('models/ckpt_deep_transit_5_v2.pkl'):
+        os.system("wget http://oss.yybear.net/ckpt_deep_transit_5_v2.pkl -P models/")
+    bboxes = dt_obj.transit_detection('models/ckpt_deep_transit_5_v2.pkl', batch_size=3, backend='megengine')
+
+    assert len(bboxes) > 0, "number should more than 1"
+    assert np.all((bboxes[:, (0,2,3,4)]<=1)&(bboxes[:, (0,2,3,4)]>=0)), "0, 2-4 shold be 0 to 1"
+    assert np.all((bboxes[:,0]<=1)&(bboxes[:,0]>=0.99)), "confidence score shold be 0 to 1"
+   
 
