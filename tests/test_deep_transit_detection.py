@@ -1,6 +1,7 @@
 import pytest
 import lightkurve as lk
 import deep_transit as dt
+import numpy as np
 
 
 def kepler_id_to_lc(kicid):
@@ -18,12 +19,13 @@ def test_detection():
     lc.sort('time')
     lc = lc[lc.time.value < 150]
 
-    print(len(lc))
-
-
     dt_obj = dt.DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper': 3})
     if not os.path.exists('models/kepler_snr_model.pth'):
         os.system("wget http://paperdata.china-vo.org/ckm/kepler_snr_model.pth -P models/")
     bboxes = dt_obj.transit_detection('models/kepler_snr_model.pth', batch_size=3)
 
-    assert len(bboxes) > 0
+    print(bboxes)
+    assert len(bboxes) > 0, "number should more than 1"
+    assert np.all(0<=bboxes[:,0]<=1), "confidence score shold be 0 to 1"
+    assert np.all(0<=bboxes[:,1]<=1), "x middle should be 0 to 1"
+

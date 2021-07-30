@@ -1,5 +1,5 @@
 import io
-
+import math
 import warnings
 import itertools
 
@@ -110,7 +110,7 @@ def _light_curve_to_image_array(lc_object, flux_range):
                     ms=72 / fig.dpi * 2,
                     color='black')
         else:
-            ax.plot(lc_object.time.value, lc_object.flux.value, '.', ms=72 / fig.dpi, color='black')
+            ax.plot(lc_object.time.value, lc_object.flux.value, '.', ms=72 / fig.dpi, color='black', mew=1.0)
             smoothed_lc = smooth_light_curve(lc_object.remove_nans(),
                                              int(0.0204 / np.nanmin(np.diff(lc_object.time.value))))
             ax.plot(smoothed_lc.time.value, smoothed_lc.flux.value, 'grey', lw=1)
@@ -192,11 +192,6 @@ def _split_light_curve(lc_object, split_time=10, back_step=3):
 class DeepTransit:
     """
     The core class of transit detection.
-
-    Attributes
-    ----------
-    lc : `~lightkurve.LightCurve`
-        
     """
     def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False,
                  lk_kwargs={}, flatten_kwargs={}):
@@ -210,9 +205,9 @@ class DeepTransit:
         time : `~astropy.time.Time` or iterable
                     Time values.  They can either be given directly as a `~astropy.time.Time` array
                     or as any iterable that initializes the `~astropy.time.Time` class.
-        flux : `~astropy.time.Time` or iterable
+        flux : `~astropy.units.Quantity` or iterable
                     Flux values for every time point.
-        flux_err : `~astropy.time.Time` or iterable
+        flux_err : `~astropy.units.Quantity` or iterable
                     Uncertainty on each flux data point.
         is_flatten : bool
                     True when receiving a flatten light, False will use the built-in flatten method.
@@ -241,14 +236,9 @@ class DeepTransit:
         else:
             self.lc = detrend_light_curve(lc_object, **flatten_kwargs)
 
-        # if exp_time == 'auto':
-        #     self.exp_time = np.nanmin(np.diff(self.lc.time.value))
-        # elif not isinstance(exp_time, float):
-        #     raise TypeError("`exp_time` should be a float type value")
 
 
-
-    def _splited_lc_generator(self):
+    def _splited_lc_generator(self, backend):
         time_initial_index = 0
         for time_block_index in np.append((np.diff(self.lc.time.value) > 10).nonzero()[0], len(self.lc) - 1):
             lc_block = self.lc[time_initial_index:time_block_index]
@@ -269,10 +259,12 @@ class DeepTransit:
                         continue
                     img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
                     image = np.array(Image.fromarray(img_arr).convert("L"))
+                    image = backend.trans(image)
+
                     yield splited_flatten_lc, image, flux_min, flux_max
 
-    def _data_loader(self, batch_size=1):
-        it = iter(self._splited_lc_generator())
+    def _data_loader(self, batch_size=1, backend=None):
+        it = iter(self._splited_lc_generator(backend))
         while True:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -281,12 +273,15 @@ class DeepTransit:
                 return
             yield chunk
 
+
     def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=None, nms_iou_threshold=None, device_str=None, backend='pytorch'):
         """
         Searching transit signals from a given light curve.
 
         Parameters
         ----------
+        model_path : str
+                    The path of the model file.
         batch_size : int
                     Batch size for increasing detection speed, especially useful for GPU
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
@@ -298,6 +293,7 @@ class DeepTransit:
         final_bboxes : np.ndarray
                     An (N, 5) shape numpy.ndarray of bounding boxes.
         """
+
         if backend == 'pytorch':
             from .backend import PytorchBackend
             backend = PytorchBackend()
@@ -306,20 +302,23 @@ class DeepTransit:
             from.mge.backend import MegengineBackend
             backend = MegengineBackend()
         backend.load_model(device_str, local_model_path)
+
         real_unit_bboxes = []
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
-        rough_length = int(len(self.lc) * exp_time / 25 * 4 / batch_size)
-        warnings.warn('The total number of progress bar is roughly estimated')
-        for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
+        rough_length = math.ceil(math.ceil((len(self.lc) * exp_time - 30) / 25 + 1) * 4 / batch_size)
+        warnings.warn('The total number of progress bar is the upper limit.')
+        for data in tqdm(self._data_loader(batch_size=batch_size, backend=backend), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
-            predicted_bboxes = backend.inference(np.stack(
-                data[:, 1]), nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold, device_str=device_str)
+            predicted_bboxes = backend.inference(
+                data[:, 1], nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold, device_str=device_str)
             for index, bboxes in enumerate(predicted_bboxes):
                 predicted_bboxes_in_real_unit = _bounding_box_to_time_flux(lc_data[index], bboxes,
                                                                            (flux_min[index], flux_max[index]))
                 real_unit_bboxes += predicted_bboxes_in_real_unit
+
         final_bboxes = np.array(backend.nms(real_unit_bboxes, nms_iou_threshold=nms_iou_threshold,  confidence_threshold=confidence_threshold))
+
         return final_bboxes
 
 
@@ -365,7 +364,7 @@ def plot_lc_with_bboxes(lc_object, bboxes, ax=None, **kwargs):
                 s=f"{real_mask[0]:.2f}",
                 color="white",
                 verticalalignment="top",
-                bbox=dict(alpha=0.5),
+                bbox=dict(alpha=0.5, color='blue'),
                 clip_on=True
             )
 
@@ -376,66 +375,37 @@ def plot_lc_with_bboxes(lc_object, bboxes, ax=None, **kwargs):
     return ax
 
 
-def select_lc_from_bboxes(lc_object, bboxes, bboxes_format='LC'):
+def select_lc_from_bboxes(lc_object, bboxes, fill=1):
     """
 
     Parameters
     ----------
-    bboxes
-    lc_object
-    bboxes_format
-
+    bboxes : list
+    lc_object : `~lightkurve.LightCurve` instance
+    fill : float
+        If None, return light curve in the bounding boxes.
+        Otherwise the outer region will be filled with a given value.
+        Default value is 1.
     Returns
     -------
-
     """
     range_logic = False
     for bbox in bboxes:
-        if bboxes_format == 'LC':
-            t0 = bbox[1] - bbox[3] / 2
-            t1 = bbox[1] + bbox[3] / 2
-            y0 = bbox[2] - bbox[4] / 2
-            y1 = bbox[2] + bbox[4] / 2
-            range_logic = range_logic | (lc_object.time.value >= t0) & (lc_object.time.value <= t1) & (
-                    lc_object.flux.value >= y0) & (lc_object.flux.value <= y1)
-    return lc_object[range_logic]
+        t0 = bbox[1] - bbox[3] / 2
+        t1 = bbox[1] + bbox[3] / 2
+        y0 = bbox[2] - bbox[4] / 2
+        y1 = bbox[2] + bbox[4] / 2
+        range_logic = range_logic | (lc_object.time.value >= t0) & (lc_object.time.value <= t1) & (
+                lc_object.flux.value >= y0) & (lc_object.flux.value <= y1)
 
-
-def __show_light_curve_image(image_array):
-    """
-    Private debugging function
-    """
-    from PIL import Image
-    img_arr = np.array(Image.fromarray(image_array).convert("L"))
-    fig, ax = plt.subplots(1)
-    ax.imshow(img_arr, cmap='binary_r', origin='upper')
-    plt.show()
-
-
-def kepler_id_to_lc(kicid):
-    from glob import iglob
-    # prepare the kicid
-
-    # fits file location
-    lc_fits_folder_path = f'/home/ckm/.lightkurve-cache/mastDownload/Kepler/*{kicid}*'
-
-    lc_collection = []
-    for i in iglob(lc_fits_folder_path + '/*llc.fits'):
-        lc_collection.append(lk.read(i).remove_nans())
-    return lk.LightCurveCollection(lc_collection)
-
-
-def tess_id_to_lc(ticid, product='spoc'):
-    from glob import glob
-    lc_collection = []
-    if product == 'spoc':
-        lc_file_paths = glob(f'/home/ckm/.lightkurve-cache/mastDownload/TESS/*{ticid}*s/*lc.fits')
-    elif product == 'qlp':
-        lc_file_paths = glob(f'/home/ckm/.lightkurve-cache/mastDownload/HLSP/*qlp*{ticid}*/*lc.fits')
-
-    for i in lc_file_paths:
-        lc_collection.append(lk.read(i).remove_nans())
-    return lk.LightCurveCollection(lc_collection)
+    if fill is not None:
+        notransiting_lc = lc_object[~range_logic]
+        notransiting_lc['flux'] = fill
+        filled_lc = lc_object[range_logic].append(notransiting_lc)
+        filled_lc.sort('time')
+        return filled_lc
+    else:
+        return lc_object[range_logic]
 
 
 def main():

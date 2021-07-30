@@ -402,13 +402,8 @@ def plot_image(image, boxes):
 
 def predict_bboxes(image, model, iou_threshold, threshold, anchors,
                    device_str):
-    if len(image.shape) == 3:
-        image = np.expand_dims(image, axis=1).astype('float32')
-    if  not isinstance(image, torch.Tensor):
-        image = torch.tensor(image)
-        if device_str:
-            image = image.to(device_str)
-
+    image = torch.tensor(np.stack(image), device=device_str)
+    
     with torch.no_grad():
         predictions = model(image)
 
