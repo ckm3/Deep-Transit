@@ -27,7 +27,7 @@ BATCH_SIZE = 96
 """
 int: Batch size of you training
 """
-CONF_THRESHOLD = 0.5
+CONF_THRESHOLD = 0.6
 """
 float: The confidence threshold for validation and detection.
 The number should be 0 to 1, it can be a represent of S/N

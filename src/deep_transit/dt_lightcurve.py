@@ -274,7 +274,7 @@ class DeepTransit:
             yield chunk
 
 
-    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=None, nms_iou_threshold=None, device_str=None, backend='pytorch'):
+    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1, device_str=None, backend='pytorch'):
         """
         Searching transit signals from a given light curve.
 
@@ -287,6 +287,7 @@ class DeepTransit:
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
         confidence_threshold : float
                     Confidence threshold for transit detection. Default value is set from model
+                    
 
         Returns
         -------

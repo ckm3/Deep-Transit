@@ -24,8 +24,8 @@ def test_detection():
         os.system("wget http://paperdata.china-vo.org/ckm/kepler_snr_model.pth -P models/")
     bboxes = dt_obj.transit_detection('models/kepler_snr_model.pth', batch_size=3)
 
-    print(bboxes)
     assert len(bboxes) > 0, "number should more than 1"
-    assert np.all(0<=bboxes[:,0]<=1), "confidence score shold be 0 to 1"
-    assert np.all(0<=bboxes[:,1]<=1), "x middle should be 0 to 1"
+    assert np.all((bboxes[:, (0,2,3,4)]<=1)&(bboxes[:, (0,2,3,4)]>=0)), "0, 2-4 shold be 0 to 1"
+    assert np.all((bboxes[:,0]<=1)&(bboxes[:,0]>=0.99)), "confidence score shold be 0 to 1"
+   
 
