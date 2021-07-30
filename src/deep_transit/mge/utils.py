@@ -146,10 +146,9 @@ def non_max_suppression(bboxes, iou_threshold, threshold, box_format="midpoint")
 
 
 def predict_bboxes(image, model, iou_threshold, threshold, anchors):
+    image = np.stack(image)
     if len(image.shape) == 3:
         image = np.expand_dims(image, axis=1)
-
-    model.eval()
     predictions = model(image)
 
     batch_size = image.shape[0]
