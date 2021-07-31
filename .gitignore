@@ -14,3 +14,4 @@ notebooks/
 build/
 src/Deep_Transit.egg-info/
 *.pkl
+docs/source/.ipynb_checkpoints

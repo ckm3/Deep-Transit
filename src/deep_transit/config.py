@@ -62,7 +62,8 @@ bool: If true, it will save model during the training step
 """
 ENABLE_AMP = True
 """
-bool: If true, AMP (automatic mixed precision) will be enabled
+bool: If true, AMP (automatic mixed precision) will be enabled.
+Note: if AMD CPU, the ENABLE_AMP should be False.
 """
 ENABLE_WANDB = False
 """

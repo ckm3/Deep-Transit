@@ -12,6 +12,8 @@ Welcome to Deep-Transit's documentation!
    :numbered:
 
    installation.rst
+   notebooks/Quickstart.ipynb
+   notebooks/Detection.ipynb
    notebooks/Train.ipynb
    reference.rst
 

@@ -35,11 +35,10 @@ def iou_width_height(boxes1, boxes2):
     return intersection / union
 
 
-def intersection_over_union(box1, box2, box_format="midpoint", GIoU=False, DIoU=False, CIoU=True, eps=1e-7):
-    # Returns the IoU of box1 to box2. box1 is N*4, box2 is N*4
+def intersection_over_union(box1, box2, box_format="midpoint", eps=1e-7):
     box2 = box2.T
     box1 = box1.T
-    # Get the coordinates of bounding boxes
+
     if box_format == "corner":  # x1, y1, x2, y2 = box1
         b1_x1, b1_y1, b1_x2, b1_y2 = box1[0], box1[1], box1[2], box1[3]
         b2_x1, b2_y1, b2_x2, b2_y2 = box2[0], box2[1], box2[2], box2[3]
@@ -59,25 +58,8 @@ def intersection_over_union(box1, box2, box_format="midpoint", GIoU=False, DIoU=
     union = w1 * h1 + w2 * h2 - inter + eps
 
     iou = inter / union
-    if GIoU or DIoU or CIoU:
-        cw = torch.max(b1_x2, b2_x2) - torch.min(b1_x1, b2_x1)  # convex (smallest enclosing box) width
-        ch = torch.max(b1_y2, b2_y2) - torch.min(b1_y1, b2_y1)  # convex height
-        if CIoU or DIoU:  # Distance or Complete IoU https://arxiv.org/abs/1911.08287v1
-            c2 = cw ** 2 + ch ** 2 + eps  # convex diagonal squared
-            rho2 = ((b2_x1 + b2_x2 - b1_x1 - b1_x2) ** 2 +
-                    (b2_y1 + b2_y2 - b1_y1 - b1_y2) ** 2) / 4  # center distance squared
-            if DIoU:
-                return iou - rho2 / c2  # DIoU
-            elif CIoU:  # https://github.com/Zzh-tju/DIoU-SSD-pytorch/blob/master/utils/box/box_utils.py#L47
-                v = (4 / np.pi ** 2) * torch.pow(torch.atan(w2 / h2) - torch.atan(w1 / h1), 2)
-                with torch.no_grad():
-                    alpha = v / (v - iou + (1 + eps))
-                return iou - (rho2 / c2 + v * alpha)  # CIoU
-        else:  # GIoU https://arxiv.org/pdf/1902.09630.pdf
-            c_area = cw * ch + eps  # convex area
-            return iou - (c_area - union) / c_area  # GIoU
-    else:
-        return iou  # IoU
+    
+    return iou  # IoU
 
 
 def old_intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
@@ -680,31 +662,6 @@ def get_loaders(train_csv_path, validation_csv_path):
     )
 
     return train_loader, validation_loader
-
-
-def plot_couple_examples(model, loader, thresh, iou_thresh, anchors):
-    model.eval()
-    x, y = next(iter(loader))
-    x = x.to("cuda")
-    with torch.no_grad():
-        out = model(x)
-        bboxes = [[] for _ in range(x.shape[0])]
-        for i in range(3):
-            batch_size, A, S, _, _ = out[i].shape
-            anchor = anchors[i]
-            boxes_scale_i = cells_to_bboxes(
-                out[i], anchor, S=S, is_preds=True
-            )
-            for idx, (box) in enumerate(boxes_scale_i):
-                bboxes[idx] += box
-
-        model.train()
-
-    for i in range(batch_size):
-        nms_boxes = non_max_suppression(
-            bboxes[i], iou_threshold=iou_thresh, threshold=thresh, box_format="midpoint",
-        )
-        plot_image(x[i].permute(1, 2, 0).detach().cpu(), nms_boxes)
 
 
 def seed_everything(seed=42):

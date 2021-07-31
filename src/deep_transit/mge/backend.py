@@ -8,12 +8,12 @@ class MegengineBackend:
         self.trans = bypass
         pass
 
-    def load_model(self, device_str, model_path):
+    def load_model(self, model_path):
         model = YOLOv3()
         self.model, self.model_config = load_model(model_path, model)
         self.model.eval()
 
-    def inference(self, input, nms_iou_threshold, confidence_threshold, device_str):
+    def inference(self, input, nms_iou_threshold, confidence_threshold):
         if nms_iou_threshold is None:
             nms_iou_threshold = self.model_config['nms_iou_threshold']
         if confidence_threshold is None:

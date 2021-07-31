@@ -10,15 +10,9 @@ import torch
 
 from PIL import Image, ImageFile
 from torch.utils.data import Dataset, DataLoader
-from ._utils import (
-    cells_to_bboxes,
-    iou_width_height as iou,
-    non_max_suppression as nms,
-    plot_image
-)
+from ._utils import iou_width_height as iou
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-
 
 class YOLODataset(Dataset):
     def __init__(
@@ -86,37 +80,4 @@ class YOLODataset(Dataset):
 
         return image, tuple(targets)
 
-
-def test_transit():
-    anchors = config.ANCHORS
-
-    transform = config.data_transforms
-
-    dataset = YOLODataset(
-        "/home/ckm/PycharmProjects/Deep-LC/YOLO-transit-SNR/Data/transit_8examples.csv",
-        "/home/ckm/PycharmProjects/Deep-LC/YOLO-transit-SNR/Data/transit-images/",
-        "/home/ckm/PycharmProjects/Deep-LC/YOLO-transit-SNR/Data/transit-labels/",
-        S=config.S,
-        anchors=anchors,
-        transform=transform,
-    )
-    S = [13, 26, 52]
-    scaled_anchors = torch.tensor(anchors) / (
-        1 / torch.tensor(S).unsqueeze(1).unsqueeze(1).repeat(1, 1, 2)
-    )
-    loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
-    for x, y in loader:
-        boxes = []
-        for i in range(y[0].shape[1]):
-            anchor = scaled_anchors[i]
-            boxes += cells_to_bboxes(
-                y[i], is_preds=False, S=y[i].shape[2], anchors=anchor
-            )[0]
-        boxes = nms(boxes, iou_threshold=0.9, threshold=0.5, box_format="midpoint")
-        plot_image(x[0].permute(1, 2, 0).to("cpu"), boxes)
-        # break
-
-
-if __name__ == "__main__":
-    test_transit()
 

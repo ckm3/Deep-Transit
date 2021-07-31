@@ -193,7 +193,7 @@ class DeepTransit:
     """
     The core class of transit detection.
     """
-    def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flatten=False,
+    def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flat=False,
                  lk_kwargs={}, flatten_kwargs={}):
         """
         Initial function for receiving an light curve object or a time series.
@@ -209,8 +209,8 @@ class DeepTransit:
                     Flux values for every time point.
         flux_err : `~astropy.units.Quantity` or iterable
                     Uncertainty on each flux data point.
-        is_flatten : bool
-                    True when receiving a flatten light, False will use the built-in flatten method.
+        is_flat : bool
+                    True when receiving a flattened light, False will use the built-in flatten method.
         lk_kwargs : dict
                     Keyword arguments of `~lightkurve.LightCurve`.
         flatten_kwargs : dict
@@ -231,7 +231,7 @@ class DeepTransit:
 
         lc_object.sort('time')
 
-        if is_flatten is True:
+        if is_flat is True:
             self.lc = lc_object
         else:
             self.lc = detrend_light_curve(lc_object, **flatten_kwargs)
@@ -274,7 +274,7 @@ class DeepTransit:
             yield chunk
 
 
-    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1, device_str=None, backend='pytorch'):
+    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1, device_str='auto', backend='pytorch'):
         """
         Searching transit signals from a given light curve.
 
@@ -286,9 +286,16 @@ class DeepTransit:
                     Batch size for increasing detection speed, especially useful for GPU
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
         confidence_threshold : float
-                    Confidence threshold for transit detection. Default value is set from model
-                    
-
+                    Confidence threshold for transit detection. If None, the value will be obtained from config.
+                    Default value is 0.6.
+        nms_iou_threshold : float
+                    IOU threshold for NMS algorithm. If None, the value will be obtained from config.
+                    Default value is 0.1.
+        device_str : str
+                    Device name. If "cuda", it will use GPU. Default is "auto".
+        backend : str
+                    Backend of the model. You can choose between "pytorch" or "megengine".
+                    Default is "pytorch".
         Returns
         -------
         final_bboxes : np.ndarray
@@ -297,12 +304,12 @@ class DeepTransit:
 
         if backend == 'pytorch':
             from .backend import PytorchBackend
-            backend = PytorchBackend()
+            backend = PytorchBackend(device_str)
         else:
             assert backend == 'megengine'
             from.mge.backend import MegengineBackend
             backend = MegengineBackend()
-        backend.load_model(device_str, local_model_path)
+        backend.load_model(local_model_path)
 
         real_unit_bboxes = []
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
@@ -312,7 +319,7 @@ class DeepTransit:
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
             predicted_bboxes = backend.inference(
-                data[:, 1], nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold, device_str=device_str)
+                data[:, 1], nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold)
             for index, bboxes in enumerate(predicted_bboxes):
                 predicted_bboxes_in_real_unit = _bounding_box_to_time_flux(lc_data[index], bboxes,
                                                                            (flux_min[index], flux_max[index]))

@@ -222,7 +222,7 @@ def get_evaluation_bboxes(
 
     return all_pred_boxes, all_true_boxes
 
-def intersection_over_union(box1, box2, box_format="midpoint", GIoU=False, DIoU=False, CIoU=True, eps=1e-7):
+def intersection_over_union(box1, box2, box_format="midpoint", eps=1e-7):
     # Returns the IoU of box1 to box2. box1 is N*4, box2 is N*4
     box2 = box2.T
     box1 = box1.T
