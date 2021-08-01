@@ -14,3 +14,4 @@ src/Deep_Transit.egg-info/
 *.ipynb_checkpoints
 notebooks/
 !docs/source/notebooks
+dist/
