@@ -1,0 +1,5 @@
+include LICENSE README.md
+include src/deep_transit/*.py
+include src/deep_transit/mge/*.py
+exclude docs/*
+exclude tests/*

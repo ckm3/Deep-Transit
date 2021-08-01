@@ -4,7 +4,7 @@ import setuptools
 
 setuptools.setup(
     name="Deep-Transit",
-    version="0.0.1",
+    version="0.1.0",
     author="Kaiming Cui",
     author_email="cuikaiming15@mails.ucas.edu.cn",
     description="Transit detection with object detection algorithm",

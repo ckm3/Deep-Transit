@@ -2,7 +2,7 @@
 
 __author__ = "Kaiming Cui, Junjie Liu"
 __license__ = "MIT"
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 from . import config
 from .dt_lightcurve import (
