@@ -5,13 +5,12 @@
 *.pyc
 _python_cache
 .vscode
-*.ipynb
 .idea
 *.egg
 *.pth
-/src/deep_transit/.ipynb_checkpoints
-notebooks/
 build/
 src/Deep_Transit.egg-info/
 *.pkl
-docs/source/.ipynb_checkpoints
+*.ipynb_checkpoints
+notebooks/
+!docs/source/notebooks

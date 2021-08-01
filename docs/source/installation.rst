@@ -4,8 +4,7 @@ Installation instructions
 Requirements
 ------------
 
-``Deep-Transit`` can take full advantage of the power of GPU. If you don't have a GPU card. 
-And it is designed to be CPU compatiable for detection and training.
+``Deep-Transit`` can take full advantage of the power of GPU. And it is designed to be CPU compatiable for detection and training.
 
 ``Deep-Transit`` has two backends, one is PyTorch and the other is MegEngine. The default is PyTorch backend.
 Optionally, if you want to switch to MegEngine backend, you need to install MegEngine with::

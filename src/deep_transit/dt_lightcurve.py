@@ -36,9 +36,9 @@ def detrend_light_curve(lc_object, window_length=0.5, edge_cutoff=0.5, break_tol
     cval: float
                 Tuning parameter for the robust estimators, default is 5.0
     sigma_upper: float
-
+                Upper limit of standard deviations for sigma clipping
     sigma_lower: float
-
+                Lower limit of standard deviations for sigma clipping
     Returns
     -------
     flatten_lc : `~lightkurve.LightCurve` instance

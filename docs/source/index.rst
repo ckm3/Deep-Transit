@@ -6,6 +6,8 @@
 Welcome to Deep-Transit's documentation!
 ========================================
 
+.. image:: intro-animation.gif
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
