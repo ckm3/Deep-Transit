@@ -1,5 +1,7 @@
 # Deep-Transit
 
+![PyPI](https://img.shields.io/pypi/v/deep-transit?style=flat) [![CI](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml/badge.svg)](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml) 
+
 ``Deep-Transit`` is an open-source Python package designed for transit detection with a 2D object detection algorithm.
 
 ![](docs/source/intro-animation.gif)
