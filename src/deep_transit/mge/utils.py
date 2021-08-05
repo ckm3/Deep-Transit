@@ -149,7 +149,7 @@ def predict_bboxes(image, model, iou_threshold, threshold, anchors):
     image = np.stack(image)
     if len(image.shape) == 3:
         image = np.expand_dims(image, axis=1)
-    predictions = model(image)
+    predictions = model(mge.tensor(image))
 
     batch_size = image.shape[0]
     bboxes = [[] for _ in range(batch_size)]
@@ -187,7 +187,7 @@ def get_evaluation_bboxes(
     all_true_boxes = []
     
     for batch_idx, (x, labels) in enumerate(tqdm.tqdm(loader)):
-        predictions = model(x)
+        predictions = model(mge.tensor(x))
         batch_size = x.shape[0]
         bboxes = [[] for _ in range(batch_size)]
         for i in range(3):
