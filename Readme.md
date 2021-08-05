@@ -1,6 +1,6 @@
 # Deep-Transit
 
-![PyPI](https://img.shields.io/pypi/v/deep-transit?style=flat) [![CI](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml/badge.svg)](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml) [![Documentation Status](https://readthedocs.org/projects/deep-transit/badge/?version=latest)](https://deep-transit.readthedocs.io/en/latest/?badge=latest) ![PyPI - License](https://img.shields.io/pypi/l/deep-transit)
+![PyPI](https://img.shields.io/pypi/v/deep-transit?style=flat) [![CI](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml/badge.svg)](https://github.com/ckm3/Deep-Transit/actions/workflows/main.yml) [![Documentation Status](https://readthedocs.org/projects/deep-transit/badge/?version=latest)](https://deep-transit.readthedocs.io/en/latest/?badge=latest) ![PyPI - License](https://img.shields.io/pypi/l/deep-transit) [![Image](https://img.shields.io/badge/arXiv-2108.00670-blue)](https://arxiv.org/abs/2108.00670)
 
 ``Deep-Transit`` is an open-source Python package designed for transit detection with a 2D object detection algorithm.
 
@@ -17,4 +17,4 @@ Please visit the [document](https://deep-transit.readthedocs.io/en/latest/index.
 
 ## Citing
 
-If you find Deep-Transit useful in your research, please cite the paper and add a footnote of this Github project.
+If you find Deep-Transit useful in your research, please cite our [paper](https://arxiv.org/abs/2108.00670) and add a footnote of this Github project.
