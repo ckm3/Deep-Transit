@@ -24,7 +24,7 @@ def train_fn(train_loader, model, optimizer,  loss_fn, scaler, scaled_anchors, g
     for batch_idx, (x, y) in enumerate(loop):
         optimizer.zero_grad()
         with gm:
-            out = model(x)
+            out = model(mge.tensor(x))
             loss = (
                     loss_fn(out[0], mge.Tensor(y[0]), scaled_anchors[0])
                     + loss_fn(out[1], mge.Tensor(y[1]), scaled_anchors[1])
