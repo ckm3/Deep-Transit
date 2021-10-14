@@ -15,6 +15,7 @@ from wotan import flatten
 from .common_utils import warning_on_one_line
 
 warnings.formatwarning = warning_on_one_line  # Raise my own warns
+plt.rcdefaults()
 
 
 def detrend_light_curve(lc_object, window_length=0.5, edge_cutoff=0.5, break_tolerance=0.5, cval=5.0, sigma_upper=3,
@@ -116,7 +117,7 @@ def _light_curve_to_image_array(lc_object, flux_range):
             ax.plot(smoothed_lc.time.value, smoothed_lc.flux.value, 'grey', lw=1)
 
         ax.set_ylim([flux_range[0], flux_range[1]])
-        fig.savefig(io_buf, format='raw', dpi=100)
+        fig.savefig(io_buf, format='raw', dpi=100, pad_inches=0)
         img_arr = np.reshape(np.frombuffer(io_buf.getvalue(), dtype=np.uint8),
                              newshape=(int(fig.bbox.bounds[3]), int(fig.bbox.bounds[2]), 4))
         io_buf.close()
