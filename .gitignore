@@ -15,3 +15,5 @@ src/Deep_Transit.egg-info/
 notebooks/
 !docs/source/notebooks
 dist/
+.history/
+.pytest_cache/

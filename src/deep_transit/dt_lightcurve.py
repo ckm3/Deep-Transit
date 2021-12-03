@@ -192,12 +192,77 @@ def _split_light_curve(lc_object, split_time=10, back_step=3):
 
 class DeepTransit:
     """
-    The core class of transit detection.
+    The core class of transit detection, which is used to load model.
     """
-    def __init__(self, lc_object=None, time=None, flux=None, flux_err=None, is_flat=False,
-                 lk_kwargs={}, flatten_kwargs={}):
+    def __init__(self, local_model_path, device_str='auto', backend='pytorch'):
         """
         Initial function for receiving an light curve object or a time series.
+
+        Parameters
+        ----------
+        local_model_path : str
+                The path of the model.
+        device_str : str
+                The device to use for inference.
+        backend : str
+                The backend to use for inference.
+        """
+
+        if backend == 'pytorch':
+            from .backend import PytorchBackend
+            self.backend = PytorchBackend(device_str)
+        else:
+            assert backend == 'megengine'
+            from.mge.backend import MegengineBackend
+            self.backend = MegengineBackend()
+
+        try:
+            self.backend.load_model(local_model_path)
+        except Exception as ValueError:
+            raise ValueError(f"The model file '{local_model_path}' is not found.")
+        
+
+    def _splited_lc_generator(self, split_time1=30, back_step1=5, split_time2=10, back_step2=3):
+        # Keep these two split time and back step args for the future use
+        time_initial_index = 0
+        for time_block_index in np.append((np.diff(self.lc.time.value) > 10).nonzero()[0], len(self.lc) - 1):
+            lc_block = self.lc[time_initial_index:time_block_index]
+            time_initial_index = time_block_index + 1
+            for start_time, stop_time in list(_split_light_curve(lc_block.remove_nans(), split_time=split_time1, back_step=back_step1)):
+                mask = (lc_block.time.value >= start_time) & (lc_block.time.value <= stop_time)
+                selected_lc = lc_block[mask]
+                exp_time = np.nanmin(np.diff(selected_lc.time.value))
+                if len(selected_lc) < 5 / exp_time:
+                    continue
+                flux_min, flux_max = np.nanmin(selected_lc.flux.value) * 1.02 - 0.02 * np.nanmax(
+                    selected_lc.flux.value), np.nanmax(selected_lc.flux.value)
+                for t0, t1 in _split_light_curve(selected_lc.remove_nans(), split_time=split_time2, back_step=back_step2):
+                    mask = (selected_lc.time.value >= t0) & (selected_lc.time.value <= t1)
+                    splited_flatten_lc = selected_lc[mask]
+                    exp_time = np.nanmin(np.diff(splited_flatten_lc.time.value))
+                    if len(splited_flatten_lc) < 1 / exp_time:
+                        continue
+                    img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
+                    image = np.array(Image.fromarray(img_arr).convert("L"))
+                    image = self.backend.trans(image)
+
+                    yield splited_flatten_lc, image, flux_min, flux_max
+
+    def _data_loader(self, batch_size=1):
+        it = iter(self._splited_lc_generator())
+        while True:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                chunk = np.array(list(itertools.islice(it, batch_size)))
+            if chunk.size == 0:
+                return
+            yield chunk
+
+
+    def transit_detection(self, lc_object=None, time=None, flux=None, flux_err=None, is_flat=False,
+                 lk_kwargs={}, flatten_kwargs={}, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1):
+        """
+        Searching transit signals from a given light curve.
 
         Parameters
         ----------
@@ -216,7 +281,27 @@ class DeepTransit:
                     Keyword arguments of `~lightkurve.LightCurve`.
         flatten_kwargs : dict
                     Keyword arguments of `detrend_light_curve` method.
+        batch_size : int
+                    Batch size for increasing detection speed, especially useful for GPU
+                    default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
+        confidence_threshold : float
+                    Confidence threshold for transit detection. If None, the value will be obtained from config.
+                    Default value is 0.6.
+        nms_iou_threshold : float
+                    IOU threshold for NMS algorithm. If None, the value will be obtained from config.
+                    Default value is 0.1.
+        device_str : str
+                    Device name. If "cuda", it will use GPU. Default is "auto".
+        backend : str
+                    Backend of the model. You can choose between "pytorch" or "megengine".
+                    Default is "pytorch".
+        final_bboxes : np.ndarray
+                    An (N, 5) shape numpy.ndarray of bounding boxes.
+        Returns
+        -------
+        final_bboxes : np.ndarray
         """
+
         if lc_object is None:
             if time is None and flux is not None:
                 time = np.arange(len(flux))
@@ -237,96 +322,21 @@ class DeepTransit:
         else:
             self.lc = detrend_light_curve(lc_object, **flatten_kwargs)
 
-
-
-    def _splited_lc_generator(self, backend):
-        time_initial_index = 0
-        for time_block_index in np.append((np.diff(self.lc.time.value) > 10).nonzero()[0], len(self.lc) - 1):
-            lc_block = self.lc[time_initial_index:time_block_index]
-            time_initial_index = time_block_index + 1
-            for start_time, stop_time in list(_split_light_curve(lc_block.remove_nans(), split_time=30, back_step=5)):
-                mask = (lc_block.time.value >= start_time) & (lc_block.time.value <= stop_time)
-                selected_lc = lc_block[mask]
-                exp_time = np.nanmin(np.diff(selected_lc.time.value))
-                if len(selected_lc) < 5 / exp_time:
-                    continue
-                flux_min, flux_max = np.nanmin(selected_lc.flux.value) * 1.02 - 0.02 * np.nanmax(
-                    selected_lc.flux.value), np.nanmax(selected_lc.flux.value)
-                for t0, t1 in _split_light_curve(selected_lc.remove_nans(), split_time=10, back_step=3):
-                    mask = (selected_lc.time.value >= t0) & (selected_lc.time.value <= t1)
-                    splited_flatten_lc = selected_lc[mask]
-                    exp_time = np.nanmin(np.diff(splited_flatten_lc.time.value))
-                    if len(splited_flatten_lc) < 1 / exp_time:
-                        continue
-                    img_arr = _light_curve_to_image_array(splited_flatten_lc, (flux_min, flux_max))
-                    image = np.array(Image.fromarray(img_arr).convert("L"))
-                    image = backend.trans(image)
-
-                    yield splited_flatten_lc, image, flux_min, flux_max
-
-    def _data_loader(self, batch_size=1, backend=None):
-        it = iter(self._splited_lc_generator(backend))
-        while True:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                chunk = np.array(list(itertools.islice(it, batch_size)))
-            if chunk.size == 0:
-                return
-            yield chunk
-
-
-    def transit_detection(self, local_model_path, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1, device_str='auto', backend='pytorch'):
-        """
-        Searching transit signals from a given light curve.
-
-        Parameters
-        ----------
-        model_path : str
-                    The path of the model file.
-        batch_size : int
-                    Batch size for increasing detection speed, especially useful for GPU
-                    default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
-        confidence_threshold : float
-                    Confidence threshold for transit detection. If None, the value will be obtained from config.
-                    Default value is 0.6.
-        nms_iou_threshold : float
-                    IOU threshold for NMS algorithm. If None, the value will be obtained from config.
-                    Default value is 0.1.
-        device_str : str
-                    Device name. If "cuda", it will use GPU. Default is "auto".
-        backend : str
-                    Backend of the model. You can choose between "pytorch" or "megengine".
-                    Default is "pytorch".
-        Returns
-        -------
-        final_bboxes : np.ndarray
-                    An (N, 5) shape numpy.ndarray of bounding boxes.
-        """
-
-        if backend == 'pytorch':
-            from .backend import PytorchBackend
-            backend = PytorchBackend(device_str)
-        else:
-            assert backend == 'megengine'
-            from.mge.backend import MegengineBackend
-            backend = MegengineBackend()
-        backend.load_model(local_model_path)
-
         real_unit_bboxes = []
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
         rough_length = math.ceil(math.ceil((len(self.lc) * exp_time - 30) / 25 + 1) * 4 / batch_size)
-        warnings.warn('The total number of progress bar is the upper limit.')
-        for data in tqdm(self._data_loader(batch_size=batch_size, backend=backend), total=rough_length):
+        warnings.warn('The total number of progress bar is the estimated upper limit.')
+        for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
-            predicted_bboxes = backend.inference(
+            predicted_bboxes = self.backend.inference(
                 data[:, 1], nms_iou_threshold=nms_iou_threshold, confidence_threshold=confidence_threshold)
             for index, bboxes in enumerate(predicted_bboxes):
                 predicted_bboxes_in_real_unit = _bounding_box_to_time_flux(lc_data[index], bboxes,
                                                                            (flux_min[index], flux_max[index]))
                 real_unit_bboxes += predicted_bboxes_in_real_unit
 
-        final_bboxes = np.array(backend.nms(real_unit_bboxes, nms_iou_threshold=nms_iou_threshold,  confidence_threshold=confidence_threshold))
+        final_bboxes = np.array(self.backend.nms(real_unit_bboxes, nms_iou_threshold=nms_iou_threshold,  confidence_threshold=confidence_threshold))
 
         return final_bboxes
 
@@ -428,15 +438,14 @@ def main():
     parser.add_argument('--confidence_threshold', type=float, help='confidence threshold', default=None)
     args = parser.parse_args()
     import matplotlib.pyplot as plt
-    search_result = lk.search_lightcurve('KIC {}'.format(args.lc), author='Kepler')
+    search_result = lk.search_lightcurve('KIC {}'.format(args.lc), author='Kepler', exptime='long')
     lc = search_result.download_all().stitch()
-    lc = lc[lc.time.value < 135]
-    dt = DeepTransit(lc, is_flatten=False, flatten_kwargs={'window_length': 0.5, 'sigma_upper':3})
+    # lc = lc[lc.time.value < 135]
+    dt = DeepTransit(args.model_path, device_str=args.device, backend=args.backend)
     flat_lc = detrend_light_curve(lc, window_length=0.5)
-    bboxes = dt.transit_detection(args.model_path, batch_size=args.batch,
-                                  nms_iou_threshold=args.nms_iou_threshold, confidence_threshold=args.confidence_threshold, device_str=args.device, backend=args.backend)
+    bboxes = dt.transit_detection(flat_lc, batch_size=args.batch, nms_iou_threshold=args.nms_iou_threshold, confidence_threshold=args.confidence_threshold)
     fig, ax = plt.subplots()
-    ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax, lw=1)
+    ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax)
     plt.show()
 
 
