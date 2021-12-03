@@ -248,8 +248,8 @@ class DeepTransit:
 
                     yield splited_flatten_lc, image, flux_min, flux_max
 
-    def _data_loader(self, batch_size=1):
-        it = iter(self._splited_lc_generator())
+    def _data_loader(self, batch_size=1, split_kwargs_dict={}):
+        it = iter(self._splited_lc_generator(**split_kwargs_dict))
         while True:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -260,7 +260,7 @@ class DeepTransit:
 
 
     def transit_detection(self, lc_object=None, time=None, flux=None, flux_err=None, is_flat=False,
-                 lk_kwargs={}, flatten_kwargs={}, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1):
+                 lk_kwargs={}, flatten_kwargs={}, split_kwargs_dict={}, batch_size=2, confidence_threshold=0.6, nms_iou_threshold=0.1):
         """
         Searching transit signals from a given light curve.
 
@@ -281,6 +281,8 @@ class DeepTransit:
                     Keyword arguments of `~lightkurve.LightCurve`.
         flatten_kwargs : dict
                     Keyword arguments of `detrend_light_curve` method.
+        split_kwargs_dict : dict
+                    Keyword arguments of `_split_light_curve` method.
         batch_size : int
                     Batch size for increasing detection speed, especially useful for GPU
                     default value is 2, if using GPU, it can be higher depending on the limitation of the GPU memory.
@@ -326,7 +328,7 @@ class DeepTransit:
         exp_time = np.nanmedian(np.diff(self.lc.time.value))
         rough_length = math.ceil(math.ceil((len(self.lc) * exp_time - 30) / 25 + 1) * 4 / batch_size)
         warnings.warn('The total number of progress bar is the estimated upper limit.')
-        for data in tqdm(self._data_loader(batch_size=batch_size), total=rough_length):
+        for data in tqdm(self._data_loader(batch_size=batch_size, split_kwargs_dict=split_kwargs_dict), total=rough_length):
             lc_data = data[:, 0]
             flux_min, flux_max = data[:, 2], data[:, 3]
             predicted_bboxes = self.backend.inference(
@@ -443,7 +445,10 @@ def main():
     # lc = lc[lc.time.value < 135]
     dt = DeepTransit(args.model_path, device_str=args.device, backend=args.backend)
     flat_lc = detrend_light_curve(lc, window_length=0.5)
-    bboxes = dt.transit_detection(flat_lc, batch_size=args.batch, nms_iou_threshold=args.nms_iou_threshold, confidence_threshold=args.confidence_threshold)
+    bboxes = dt.transit_detection(flat_lc, 
+                                batch_size=args.batch, 
+                                nms_iou_threshold=args.nms_iou_threshold, 
+                                confidence_threshold=args.confidence_threshold)
     fig, ax = plt.subplots()
     ax = plot_lc_with_bboxes(flat_lc, bboxes, ax=ax)
     plt.show()
